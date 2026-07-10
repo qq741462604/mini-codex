@@ -11,8 +11,25 @@ import java.util.*;
 public class ToolRegistry {
 
 
+
     private final Map<String,Tool> tools =
             new HashMap<>();
+
+
+
+    public ToolRegistry(
+            List<Tool> toolList
+    ){
+
+
+        for(Tool tool:toolList){
+
+            register(tool);
+
+        }
+
+
+    }
 
 
 

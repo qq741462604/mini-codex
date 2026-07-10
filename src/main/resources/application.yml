@@ -1,6 +1,10 @@
 server:
   port: 8080
 
+codex:
+  workspace:
+    path: ./workspace
+
 spring:
   profiles:
     active: local
