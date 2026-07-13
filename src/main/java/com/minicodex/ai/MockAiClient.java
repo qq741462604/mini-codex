@@ -1,14 +1,21 @@
 package com.minicodex.ai;
 
 
+import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 
 
 import java.util.List;
 
 
-@Component
-public class MockAiClient implements AiClient {
+//@Primary
+//@Component
+public class MockAiClient
+        implements AiClient {
+
+
+
+    private int count=0;
 
 
 
@@ -22,12 +29,43 @@ public class MockAiClient implements AiClient {
                 new AiResponse();
 
 
-        response.setContent(
-                "Mock AI Response"
-        );
+
+        if(count==0){
 
 
-        response.setNeedTool(false);
+            ToolCall call =
+                    new ToolCall();
+
+
+            call.setCallTool(true);
+
+            call.setToolName(
+                    "read_file"
+            );
+
+
+            call.setArguments(
+                    "test/UserController.java"
+            );
+
+
+            response.setToolCall(
+                    call
+            );
+
+
+            count++;
+
+        }
+        else{
+
+
+            response.setContent(
+                    "文件读取完成，代码分析结束"
+            );
+
+
+        }
 
 
         return response;

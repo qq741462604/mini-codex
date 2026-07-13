@@ -8,16 +8,18 @@ import lombok.Data;
 public class AiResponse {
 
 
+    /**
+     * 普通文本回复
+     */
     private String content;
 
 
-    private boolean needTool;
 
+    /**
+     * 工具调用
+     */
+    private ToolCall toolCall;
 
-    private String toolName;
-
-
-    private String toolArguments;
 
 
 }
