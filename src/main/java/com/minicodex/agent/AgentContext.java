@@ -1,39 +1,61 @@
 package com.minicodex.agent;
 
 
-import com.minicodex.ai.AiMessage;
+import com.minicodex.agent.observation.Observation;
+import com.minicodex.memory.Memory;
+import com.minicodex.planner.CodePlan;
+import com.minicodex.project.ProjectIndex;
+import com.minicodex.skill.Skill;
+import com.minicodex.trace.AgentTrace;
+import lombok.Builder;
 import lombok.Data;
 
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 
 
 
 @Data
+@Builder
 public class AgentContext {
 
 
+    private String agentId;
+
+
+
+    private String task;
+
+    private ProjectIndex projectIndex;
+
+    private AgentTrace trace;
+
+    private String lastPlanHash;
+
+    @Builder.Default
+    private Map<String,Object> variables =
+            new HashMap<>();
+
+
+
+    @Builder.Default
+    private List<Memory> memories =
+            new ArrayList<>();
     /**
-     * 用户原始输入
+     * 工具观察结果
      */
-    private String userInput;
-
-
-
-    /**
-     * 当前执行步骤
-     */
-    private int step;
-
-
-
-    /**
-     * AI上下文消息
-     */
-    private List<AiMessage> messages =
+    @Builder.Default
+    private List<Observation> observations =
             new ArrayList<>();
 
+    @Builder.Default
+    private List<Skill> skills =
+            new ArrayList<>();
 
-
+    @Builder.Default
+    private AgentStatus status =
+            AgentStatus.IDLE;
 }

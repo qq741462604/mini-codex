@@ -1,15 +1,20 @@
 server:
   port: 8080
 
+logging:
+  level:
+    com.minicodex.trace: INFO
+
 codex:
   workspace:
-    path: ./workspace
-  ai:
+    root: D:/ideaProject/test
+
+llm:
+  api:
     url: https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
-    apiKey: ${LLM_API_KEY}
-    model: "qwen3.7-plus"
-  agent:
-    max-step: 5
+    key: ${LLM_API_KEY}
+
+  model: qwen3.7-plus
 
 spring:
   profiles:
