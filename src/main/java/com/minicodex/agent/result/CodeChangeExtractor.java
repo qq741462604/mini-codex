@@ -2,6 +2,7 @@ package com.minicodex.agent.result;
 
 
 import com.minicodex.agent.observation.Observation;
+import com.minicodex.tool.ToolInput;
 import org.springframework.stereotype.Component;
 
 
@@ -43,12 +44,7 @@ public class CodeChangeExtractor {
 
 
 
-            String tool =
-                    o.getTool();
-
-
-
-            if(!isCodeChangeTool(tool)){
+            if(!isCodeChangeTool(o.getTool())){
 
                 continue;
 
@@ -58,13 +54,12 @@ public class CodeChangeExtractor {
 
             String path =
                     extractPath(
-                            o.getResult()
+                            o
                     );
 
 
-            if(path==null
-                    ||
-                    path.trim().isEmpty()){
+
+            if(path==null){
 
                 continue;
 
@@ -75,9 +70,13 @@ public class CodeChangeExtractor {
             result.add(
                     CodeChange.builder()
                             .action(
-                                    convertAction(tool)
+                                    convertAction(
+                                            o.getTool()
+                                    )
                             )
-                            .path(path)
+                            .path(
+                                    normalize(path)
+                            )
                             .success(true)
                             .build()
             );
@@ -86,12 +85,9 @@ public class CodeChangeExtractor {
         }
 
 
-
-        return result;
+        return distinct(result);
 
     }
-
-
 
 
 
@@ -113,163 +109,20 @@ public class CodeChangeExtractor {
 
 
 
-
-
-
-
-    private String convertAction(
-            String tool
-    ){
-
-        switch(tool){
-
-            case "create_file":
-                return "create";
-
-
-            case "edit_file":
-                return "edit";
-
-
-            case "write_file":
-                return "write";
-
-
-            default:
-                return tool;
-
-        }
-
-    }
-
-
-
-
-
-
-
-
-
     private String extractPath(
-            Object result
+            Observation o
     ){
 
 
-        if(result==null){
-
-            return null;
-
-        }
+        if(o.getInput()
+                instanceof ToolInput){
 
 
+            ToolInput input =
+                    (ToolInput)o.getInput();
 
 
-        /*
-         * 第一种：
-         *
-         * create success:xxx
-         *
-         */
-        String text =
-                result.toString();
-
-
-        if(text.contains(":")){
-
-
-            int index =
-                    text.indexOf(":");
-
-
-
-            String path =
-                    text.substring(
-                                    index + 1
-                            )
-                            .trim();
-
-
-
-            if(!path.isEmpty()){
-
-                return normalize(path);
-
-            }
-
-        }
-
-
-
-
-
-
-        /*
-         * 第二种：
-         *
-         * 如果以后返回 Map
-         *
-         */
-        if(result instanceof java.util.Map){
-
-
-            java.util.Map<?,?> map =
-                    (java.util.Map<?,?>) result;
-
-
-
-            Object path =
-                    map.get("path");
-
-
-            if(path!=null){
-
-                return normalize(
-                        path.toString()
-                );
-
-            }
-
-        }
-
-
-
-
-
-
-        /*
-         * 第三种：
-         *
-         * 返回对象，有getPath()
-         *
-         */
-        try{
-
-
-            java.lang.reflect.Method method =
-                    result.getClass()
-                            .getMethod(
-                                    "getPath"
-                            );
-
-
-            Object path =
-                    method.invoke(
-                            result
-                    );
-
-
-            if(path!=null){
-
-                return normalize(
-                        path.toString()
-                );
-
-            }
-
-
-        }catch(Exception ignored){
-
-
+            return input.getPath();
 
         }
 
@@ -283,6 +136,29 @@ public class CodeChangeExtractor {
 
 
 
+    private String convertAction(
+            String tool
+    ){
+
+        if("create_file".equals(tool)){
+
+            return "create";
+
+        }
+
+
+        if("edit_file".equals(tool)){
+
+            return "edit";
+
+        }
+
+
+        return "write";
+
+    }
+
+
 
 
 
@@ -290,11 +166,46 @@ public class CodeChangeExtractor {
             String path
     ){
 
-        return path
-                .replace("\\","/");
+        return path.replace("\\","/");
 
     }
 
+
+
+
+
+    private List<CodeChange> distinct(
+            List<CodeChange> list
+    ){
+
+        List<CodeChange> result =
+                new ArrayList<>();
+
+
+        for(CodeChange c:list){
+
+
+            boolean exists =
+                    result.stream()
+                            .anyMatch(
+                                    x ->
+                                            x.getPath()
+                                                    .equals(c.getPath())
+                            );
+
+
+            if(!exists){
+
+                result.add(c);
+
+            }
+
+        }
+
+
+        return result;
+
+    }
 
 
 }

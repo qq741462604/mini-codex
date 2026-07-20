@@ -37,5 +37,5 @@ public class Observation {
      */
     private String error;
 
-
+    private Object input;
 }

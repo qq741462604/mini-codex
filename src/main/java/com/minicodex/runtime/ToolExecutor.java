@@ -6,6 +6,7 @@ import com.minicodex.agent.observation.Observation;
 import com.minicodex.planner.CodePlan;
 import com.minicodex.planner.PlanStep;
 import com.minicodex.tool.AgentTool;
+import com.minicodex.tool.FileOperationResult;
 import com.minicodex.trace.TraceStep;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 
 @Slf4j
@@ -41,6 +43,45 @@ public class ToolExecutor {
         for(PlanStep step:plan.getSteps()){
 
 
+
+            /*
+             *
+             * 防止重复create
+             *
+             */
+            if(shouldSkipDuplicateCreate(
+                    step,
+                    context
+            )){
+
+                com.minicodex.tool.ToolInput input =
+                        (com.minicodex.tool.ToolInput) step.getInput();
+
+
+
+                String path =
+                        input.getPath();
+                log.info(
+                        "skip duplicate create file={}",
+                        path
+                );
+
+
+                results.add(
+                        ToolCallResult.failed(
+                                step.getTool(),
+                                "file already created in current agent run"
+                        )
+                );
+
+
+                continue;
+
+            }
+
+
+
+
             AgentTool tool =
                     toolRegistry.getTool(
                             step.getTool()
@@ -60,19 +101,25 @@ public class ToolExecutor {
 
 
                 continue;
+
             }
 
 
 
 
+
             try{
+
+
                 long start =
                         System.currentTimeMillis();
+
 
 
                 tool.validate(
                         step.getInput()
                 );
+
 
 
                 Object result =
@@ -82,13 +129,16 @@ public class ToolExecutor {
                         );
 
 
+
                 long cost =
                         System.currentTimeMillis()
                                 -
                                 start;
 
 
+
                 if(context.getTrace()!=null){
+
 
                     context.getTrace()
                             .add(
@@ -101,44 +151,59 @@ public class ToolExecutor {
                                             .build()
                             );
 
+
                 }
 
 
-                log.info(
-                        "trace steps size after tool={}",
-                        context.getTrace().getSteps().size()
+
+                ToolCallResult callResult =
+                        buildToolResult(
+                                step.getTool(),
+                                result
+                        );
+
+
+
+                results.add(
+                        callResult
                 );
-
-
 
                 context.getObservations()
                         .add(
                                 Observation.builder()
                                         .tool(step.getTool())
-                                        .success(true)
+                                        .success(callResult.isSuccess())
                                         .result(result)
+                                        .input(step.getInput())
+                                        .error(
+                                                callResult.isSuccess()
+                                                        ?
+                                                        null
+                                                        :
+                                                        "tool execute failed"
+                                        )
                                         .build()
                         );
 
-                results.add(
-                        ToolCallResult.success(
-                                step.getTool(),
-                                result
-                        )
+                log.info(
+                        "tool={} success={} result={}",
+                        step.getTool(),
+                        callResult.isSuccess(),
+                        result
                 );
 
 
 
             }catch(Exception e){
 
-                context.getObservations()
-                        .add(
-                                Observation.builder()
-                                        .tool(step.getTool())
-                                        .success(false)
-                                        .error(e.getMessage())
-                                        .build()
-                        );
+
+                log.error(
+                        "tool execute failed tool={}",
+                        step.getTool(),
+                        e
+                );
+
+
 
                 results.add(
                         ToolCallResult.failed(
@@ -147,13 +212,146 @@ public class ToolExecutor {
                         )
                 );
 
+
             }
+
 
         }
 
 
 
         return results;
+
+    }
+
+
+    private boolean samePath(
+            String a,
+            String b
+    ){
+
+        if(a==null || b==null){
+            return false;
+        }
+
+
+        return a.replace("\\","/")
+                .equals(
+                        b.replace("\\","/")
+                );
+
+    }
+
+    private boolean shouldSkipDuplicateCreate(
+            PlanStep step,
+            AgentContext context
+    ){
+
+        if(!"create_file".equals(step.getTool())){
+
+            return false;
+
+        }
+
+
+        if(!(step.getInput() instanceof com.minicodex.tool.ToolInput)){
+
+
+            return false;
+
+        }
+
+
+
+        com.minicodex.tool.ToolInput input =
+                (com.minicodex.tool.ToolInput) step.getInput();
+
+
+
+        String path =
+                input.getPath();
+
+
+
+        if(path==null){
+
+
+            return false;
+
+        }
+
+
+
+        if(context.getObservations()==null){
+
+
+            return false;
+
+        }
+
+
+
+        return context.getObservations()
+                .stream()
+                .anyMatch(
+                        o ->
+                        {
+                            if(!o.isSuccess()
+                                    ||
+                                    o.getResult()==null){
+
+                                return false;
+                            }
+
+
+                            return samePath(
+                                    o.getResult()
+                                            .toString(),
+                                    path
+                            );
+                        }
+                );
+
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+    private ToolCallResult buildToolResult(
+            String tool,
+            Object result
+    ){
+
+        if(result instanceof FileOperationResult){
+
+            FileOperationResult r =
+                    (FileOperationResult) result;
+
+
+            if(!r.isSuccess()){
+
+                return ToolCallResult.failed(
+                        tool,
+                        r.getMessage()
+                );
+
+            }
+
+        }
+
+
+        return ToolCallResult.success(
+                tool,
+                result
+        );
 
     }
 

@@ -31,6 +31,8 @@ public class AgentContext {
 
     private ProjectIndex projectIndex;
 
+//    private String workspace;
+
     private AgentTrace trace;
 
     private String lastPlanHash;

@@ -2,6 +2,8 @@ package com.minicodex.tool;
 
 
 import com.minicodex.agent.AgentContext;
+import com.minicodex.workspace.WorkspaceService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 
@@ -12,8 +14,13 @@ import java.nio.file.Files;
 
 
 @Component
+@RequiredArgsConstructor
 public class CreateFileTool
         extends BaseTool {
+
+
+
+    private final WorkspaceService workspaceService;
 
 
 
@@ -36,11 +43,13 @@ public class CreateFileTool
 
 
 
+
     @Override
     public Object execute(
             Object input,
             AgentContext context
     ) throws Exception {
+
 
 
         ToolInput toolInput =
@@ -49,26 +58,10 @@ public class CreateFileTool
 
 
         File file =
-                new File(
+                workspaceService.resolve(
                         toolInput.getPath()
                 );
 
-
-
-        if(file.exists()){
-
-
-            return FileOperationResult.builder()
-                    .action("create")
-                    .path(file.getPath())
-                    .success(false)
-                    .message(
-                            "file already exists"
-                    )
-                    .build();
-
-
-        }
 
 
 
@@ -77,7 +70,9 @@ public class CreateFileTool
 
 
 
-        if(parent!=null){
+        if(parent!=null
+                &&
+                !parent.exists()){
 
             parent.mkdirs();
 
@@ -85,6 +80,20 @@ public class CreateFileTool
 
 
 
+
+
+        boolean exists =
+                file.exists();
+
+
+
+        /*
+         *
+         * Agent场景:
+         *
+         * 已存在也允许覆盖
+         *
+         */
         Files.write(
                 file.toPath(),
                 toolInput.getContent()
@@ -96,11 +105,23 @@ public class CreateFileTool
 
 
         return FileOperationResult.builder()
-                .action("create")
-                .path(file.getPath())
+                .action(
+                        exists
+                                ?
+                                "update"
+                                :
+                                "create"
+                )
+                .path(
+                        workspaceService.relativePath(file)
+                )
                 .success(true)
                 .message(
-                        "create success"
+                        exists
+                                ?
+                                "file exists overwrite success"
+                                :
+                                "create success"
                 )
                 .build();
 

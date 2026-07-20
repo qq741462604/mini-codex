@@ -9,11 +9,12 @@ import com.minicodex.project.ProjectIndex;
 import com.minicodex.project.ProjectIndexer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import lombok.var;
 import org.springframework.stereotype.Component;
 
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 
 @Slf4j
@@ -22,19 +23,7 @@ import java.util.List;
 public class AgentLoop {
 
 
-    /**
-     * 最大思考轮次
-     */
     private static final int MAX_ITERATION = 5;
-
-
-    /**
-     * 最大分析轮次
-     *
-     * 防止一直 search/read
-     */
-    private static final int MAX_ANALYSIS_ITERATION = 2;
-
 
 
     private final Planner planner;
@@ -44,7 +33,6 @@ public class AgentLoop {
 
 
     private final ProjectIndexer projectIndexer;
-
 
 
 
@@ -59,8 +47,8 @@ public class AgentLoop {
         );
 
 
-
-        int analysisCount = 0;
+        Set<String> executedPlans =
+                new HashSet<>();
 
 
 
@@ -76,7 +64,6 @@ public class AgentLoop {
 
 
             CodePlan plan;
-
 
 
             try{
@@ -95,7 +82,6 @@ public class AgentLoop {
                         "planner failed",
                         e
                 );
-
 
                 return;
 
@@ -123,38 +109,37 @@ public class AgentLoop {
 
 
 
-            log.info(
-                    "plan={}",
-                    plan
+
+
+            String planKey =
+                    plan.toString();
+
+
+
+            if(executedPlans.contains(planKey)){
+
+
+                log.warn(
+                        "duplicate plan detected, stop"
+                );
+
+
+                return;
+
+            }
+
+
+
+            executedPlans.add(
+                    planKey
             );
 
 
 
-
-
-            /**
-             * 判断是不是分析动作
-             */
-            boolean analysisPlan =
-                    isAnalysisPlan(
-                            plan
-                    );
-
-
-
-            if(analysisPlan){
-
-
-                analysisCount++;
-
-
-                log.info(
-                        "analysis phase count={}",
-                        analysisCount
-                );
-
-
-            }
+            log.info(
+                    "plan={}",
+                    plan
+            );
 
 
 
@@ -168,10 +153,12 @@ public class AgentLoop {
 
 
 
-            appendObservation(
-                    context,
-                    results
-            );
+
+//            appendObservation(
+//                    context,
+//                    results
+//            );
+
 
 
 
@@ -180,6 +167,7 @@ public class AgentLoop {
                     projectIndexer.build(
                             context.getObservations()
                     );
+
 
 
             context.setProjectIndex(
@@ -197,16 +185,17 @@ public class AgentLoop {
 
 
 
-            /**
-             * 如果已经修改代码
-             * 直接结束
+            /*
+             *
+             * 核心：
+             * 只有真正修改成功才结束
+             *
              */
-            if(hasCodeChange(results)){
+            if(hasSuccessfulCodeChange(results)){
 
 
                 log.info(
-                        "code changed, observations={}",
-                        context.getObservations()
+                        "code changed successfully, finish agent"
                 );
 
 
@@ -214,27 +203,6 @@ public class AgentLoop {
 
             }
 
-
-
-
-
-
-            /**
-             * 已经分析两轮
-             *
-             * 强制进入下一阶段
-             *
-             * 下一次Planner必须生成代码
-             */
-            if(analysisCount>=MAX_ANALYSIS_ITERATION){
-
-
-                log.info(
-                        "analysis enough, continue coding phase"
-                );
-
-
-            }
 
 
 
@@ -247,8 +215,6 @@ public class AgentLoop {
                 "agent reach max iteration"
         );
 
-
-
     }
 
 
@@ -257,55 +223,51 @@ public class AgentLoop {
 
 
 
+//    private void appendObservation(
+//            AgentContext context,
+//            List<ToolCallResult> results
+//    ){
+//
+//
+//
+//        for(ToolCallResult result:results){
+//
+//
+//
+//            context.getObservations()
+//                    .add(
+//                            Observation.builder()
+//                                    .tool(
+//                                            result.getTool()
+//                                    )
+//                                    .success(
+//                                            result.isSuccess()
+//                                    )
+//                                    .result(
+//                                            result.getResult()
+//                                    )
+//                                    .error(
+//                                            result.getError()
+//                                    )
+//                                    .build()
+//                    );
+//
+//
+//        }
+//
+//
+//    }
 
 
-    private void appendObservation(
-            AgentContext context,
+
+
+
+
+
+    private boolean hasSuccessfulCodeChange(
             List<ToolCallResult> results
     ){
 
-
-        for(ToolCallResult result:results){
-
-
-            context.getObservations()
-                    .add(
-                            Observation.builder()
-                                    .tool(
-                                            result.getTool()
-                                    )
-                                    .success(
-                                            result.isSuccess()
-                                    )
-                                    .result(
-                                            result.getResult()
-                                    )
-                                    .error(
-                                            result.getError()
-                                    )
-                                    .build()
-                    );
-
-
-        }
-
-
-    }
-
-
-
-
-
-
-
-
-
-    /**
-     * 判断是否进入代码修改阶段
-     */
-    private boolean hasCodeChange(
-            List<ToolCallResult> results
-    ){
 
 
         for(ToolCallResult result:results){
@@ -318,16 +280,19 @@ public class AgentLoop {
             }
 
 
+
             String tool =
                     result.getTool();
 
 
 
-            if("create_file".equals(tool)
-                    ||
-                    "write_file".equals(tool)
-                    ||
-                    "edit_file".equals(tool)){
+            if(
+                    "create_file".equals(tool)
+                            ||
+                            "write_file".equals(tool)
+                            ||
+                            "edit_file".equals(tool)
+            ){
 
 
                 return true;
@@ -338,53 +303,10 @@ public class AgentLoop {
         }
 
 
+
         return false;
 
     }
-
-
-
-
-
-
-
-
-
-    /**
-     * 当前Plan是否只是分析
-     */
-    private boolean isAnalysisPlan(
-            CodePlan plan
-    ){
-
-
-        for(var step:plan.getSteps()){
-
-
-            String tool =
-                    step.getTool();
-
-
-
-            if("create_file".equals(tool)
-                    ||
-                    "write_file".equals(tool)
-                    ||
-                    "edit_file".equals(tool)){
-
-
-                return false;
-
-            }
-
-
-        }
-
-
-        return true;
-
-    }
-
 
 
 }
