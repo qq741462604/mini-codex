@@ -12,6 +12,7 @@ import com.minicodex.prompt.PromptTemplateService;
 import com.minicodex.skill.SkillManager;
 import com.minicodex.tool.ToolInput;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 
@@ -20,7 +21,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class QwenPlanner
@@ -41,18 +42,17 @@ public class QwenPlanner
     private final ObjectMapper objectMapper;
 
 
-
     @Override
     public CodePlan createPlan(
             AgentContext context
-    ){
+    ) {
 
 
         String template =
                 promptLoader.load(
                         "planner"
                 );
-        Map<String,String> vars =
+        Map<String, String> vars =
                 new HashMap<>();
 
 
@@ -61,17 +61,36 @@ public class QwenPlanner
                 projectContextService.buildSummary()
         );
 
+        String matchedSkills =
+                skillManager.buildContext(
+                        context.getTask()
+                );
+
+
+        log.info(
+                "========== MATCHED SKILLS ==========\n{}",
+                matchedSkills
+        );
+
 
         vars.put(
                 "SKILLS",
-                skillManager.buildContext()
+                matchedSkills
         );
+
 
 
         vars.put(
                 "TASK",
                 context.getTask()
         );
+
+        vars.put(
+                "PHASE",
+                context.getPhase()
+                        .name()
+        );
+
 
         try {
             vars.put(
@@ -96,13 +115,10 @@ public class QwenPlanner
                 );
 
 
-
-
         String response =
                 llmClient.chat(
                         prompt
                 );
-
 
 
         return parse(
@@ -113,16 +129,13 @@ public class QwenPlanner
     }
 
 
-
-
-
     private CodePlan parse(
             String task,
             String json
-    ){
+    ) {
 
 
-        try{
+        try {
 
 
             JsonNode root =
@@ -131,10 +144,8 @@ public class QwenPlanner
                     );
 
 
-
             List<PlanStep> steps =
                     new ArrayList<>();
-
 
 
             int index = 1;
@@ -142,15 +153,15 @@ public class QwenPlanner
             JsonNode stepArray;
 
 
-            if(root.has("steps")){
+            if (root.has("steps")) {
 
                 stepArray = root.get("steps");
 
-            }else if(root.has("plan")){
+            } else if (root.has("plan")) {
 
                 stepArray = root.get("plan");
 
-            }else{
+            } else {
 
                 throw new RuntimeException(
                         "plan field not found"
@@ -159,38 +170,28 @@ public class QwenPlanner
             }
 
 
-
-            for(JsonNode node:stepArray){
-
-//            for(JsonNode node:
-//                    root.get("steps")){
+            for (JsonNode node : stepArray) {
 
 
-//                ToolInput input =
-//                        objectMapper.treeToValue(
-//                                node.get("input"),
-//                                ToolInput.class
-//                        );
                 JsonNode inputNode;
 
 
-                if(node.has("input")){
+                if (node.has("input")) {
 
                     inputNode =
                             node.get("input");
 
-                }else if(node.has("args")){
+                } else if (node.has("args")) {
 
                     inputNode =
                             node.get("args");
 
-                }else{
+                } else {
 
                     inputNode =
                             objectMapper.createObjectNode();
 
                 }
-
 
 
                 ToolInput input =
@@ -222,15 +223,13 @@ public class QwenPlanner
             }
 
 
-
             return CodePlan.builder()
                     .task(task)
                     .steps(steps)
                     .build();
 
 
-
-        }catch(Exception e){
+        } catch (Exception e) {
 
 
             throw new RuntimeException(
@@ -248,18 +247,17 @@ public class QwenPlanner
 
     private String buildProjectIndex(
             AgentContext context
-    ){
+    ) {
 
 
-        if(context.getProjectIndex()==null){
+        if (context.getProjectIndex() == null) {
 
             return "";
 
         }
 
 
-
-        try{
+        try {
 
 
             return objectMapper.writeValueAsString(
@@ -267,7 +265,7 @@ public class QwenPlanner
             );
 
 
-        }catch(Exception e){
+        } catch (Exception e) {
 
 
             return "";
@@ -279,7 +277,7 @@ public class QwenPlanner
 
     private String extractJson(
             String text
-    ){
+    ) {
 
 
         int start =
@@ -290,12 +288,11 @@ public class QwenPlanner
                 text.lastIndexOf("}");
 
 
-
-        if(start>=0 && end>start){
+        if (start >= 0 && end > start) {
 
             return text.substring(
                     start,
-                    end+1
+                    end + 1
             );
 
         }
@@ -305,7 +302,6 @@ public class QwenPlanner
 
 
     }
-
 
 
 }

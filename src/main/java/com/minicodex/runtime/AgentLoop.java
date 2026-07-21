@@ -2,6 +2,8 @@ package com.minicodex.runtime;
 
 
 import com.minicodex.agent.AgentContext;
+import com.minicodex.agent.AgentPhase;
+import com.minicodex.agent.AgentStatus;
 import com.minicodex.agent.observation.Observation;
 import com.minicodex.planner.CodePlan;
 import com.minicodex.planner.Planner;
@@ -46,6 +48,17 @@ public class AgentLoop {
                 context.getTask()
         );
 
+        if(context.getPhase()==null){
+
+            context.setPhase(
+                    AgentPhase.ANALYSIS
+            );
+
+        }
+
+        context.setStatus(
+                AgentStatus.ANALYZING
+        );
 
         Set<String> executedPlans =
                 new HashSet<>();
@@ -60,6 +73,7 @@ public class AgentLoop {
                     "agent iteration={}",
                     i+1
             );
+
 
 
 
@@ -152,14 +166,14 @@ public class AgentLoop {
                     );
 
 
-
-
-//            appendObservation(
-//                    context,
-//                    results
-//            );
-
-
+            updatePhase(
+                    context,
+                    results
+            );
+            log.info(
+                    "===== TOOL RESULTS ===== {}",
+                    results
+            );
 
 
 
@@ -193,15 +207,18 @@ public class AgentLoop {
              */
             if(hasSuccessfulCodeChange(results)){
 
-
                 log.info(
                         "code changed successfully, finish agent"
                 );
 
-
                 return;
 
             }
+
+
+            log.info(
+                    "no code change, continue next iteration"
+            );
 
 
 
@@ -222,43 +239,70 @@ public class AgentLoop {
 
 
 
-
-//    private void appendObservation(
-//            AgentContext context,
-//            List<ToolCallResult> results
-//    ){
-//
-//
-//
-//        for(ToolCallResult result:results){
-//
-//
-//
-//            context.getObservations()
-//                    .add(
-//                            Observation.builder()
-//                                    .tool(
-//                                            result.getTool()
-//                                    )
-//                                    .success(
-//                                            result.isSuccess()
-//                                    )
-//                                    .result(
-//                                            result.getResult()
-//                                    )
-//                                    .error(
-//                                            result.getError()
-//                                    )
-//                                    .build()
-//                    );
-//
-//
-//        }
-//
-//
-//    }
+    private void updatePhase(
+            AgentContext context,
+            List<ToolCallResult> results
+    ){
 
 
+        boolean changed=false;
+
+
+        for(ToolCallResult result:results){
+
+
+            if(!result.isSuccess()){
+
+                continue;
+
+            }
+
+
+            String tool =
+                    result.getTool();
+
+
+            if("create_file".equals(tool)
+                    ||
+                    "write_file".equals(tool)
+                    ||
+                    "edit_file".equals(tool)
+            ){
+
+                changed=true;
+
+            }
+
+        }
+
+
+        if(changed){
+
+
+            context.setPhase(
+                    AgentPhase.VERIFY
+            );
+
+
+            return;
+
+        }
+
+
+
+        if(context.getPhase()
+                ==
+                AgentPhase.ANALYSIS){
+
+
+            context.setPhase(
+                    AgentPhase.CODING
+            );
+
+        }
+
+
+    }
 
 
 

@@ -1,21 +1,15 @@
 package com.minicodex.agent;
 
-
 public enum AgentStatus {
-
 
     IDLE,
 
+    ANALYZING,
 
-    THINKING,
+    CODING,
 
+    VERIFYING,
 
-    EXECUTING,
-
-
-    FINISHED,
-
-
-    FAILED
+    FINISHED
 
 }

@@ -48,6 +48,9 @@ public class Agent {
                             .agentId(id)
                             .task(task)
                             .trace(trace)
+                            .phase(
+                                    AgentPhase.ANALYSIS
+                            )
                             .memories(
                                     memoryStore == null
                                             ?

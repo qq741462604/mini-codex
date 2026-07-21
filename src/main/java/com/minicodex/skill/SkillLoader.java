@@ -114,7 +114,6 @@ public class SkillLoader {
             File file
     ){
 
-
         try(
                 BufferedReader reader =
                         new BufferedReader(
@@ -125,7 +124,6 @@ public class SkillLoader {
 
             StringBuilder builder =
                     new StringBuilder();
-
 
 
             String line;
@@ -147,6 +145,7 @@ public class SkillLoader {
                     new Skill();
 
 
+
             skill.setName(
                     file.getParentFile()
                             .getName()
@@ -158,19 +157,180 @@ public class SkillLoader {
             );
 
 
+            parseSections(
+                    skill
+            );
+
+
             return skill;
 
 
 
         }catch(Exception e){
 
-
             throw new RuntimeException(e);
+
+        }
+
+    }
+
+    private void parseSections(
+            Skill skill
+    ){
+
+
+        String content =
+                skill.getContent();
+
+
+
+        String mode=null;
+
+
+
+        for(String line:
+                content.split("\n")){
+
+
+            line=line.trim();
+
+
+
+            if(line.isEmpty()){
+
+                continue;
+
+            }
+
+
+
+            if(line.startsWith("keywords")){
+
+                mode="keywords";
+                continue;
+
+            }
+
+
+            if(line.startsWith("rules")){
+
+                mode="rules";
+                continue;
+
+            }
+
+
+            if(line.startsWith("forbidden")){
+
+                mode="forbidden";
+                continue;
+
+            }
+
+
+
+            if(line.startsWith("#")){
+
+                continue;
+
+            }
+
+
+
+            if("keywords".equals(mode)){
+
+
+                skill.getKeywords()
+                        .add(line);
+
+
+            }
+
+
+            if("rules".equals(mode)){
+
+
+                skill.getRules()
+                        .add(line);
+
+
+            }
+
+
+
+            if("forbidden".equals(mode)){
+
+
+                skill.getForbidden()
+                        .add(line);
+
+
+            }
+
 
         }
 
 
     }
 
+    private List<String> extractKeywords(
+            String content
+    ){
+
+
+        List<String> result =
+                new ArrayList<>();
+
+
+        boolean start=false;
+
+
+        for(String line:
+                content.split("\n")){
+
+
+            line=line.trim();
+
+
+            if(line.startsWith("keywords")){
+
+                start=true;
+
+                continue;
+
+            }
+
+
+            if(start){
+
+
+                if(line.startsWith("#")
+                        ||
+                        line.contains(":")){
+
+
+                    break;
+
+                }
+
+
+                if(!line.isEmpty()){
+
+
+                    result.add(
+                            line.replace("-","")
+                                    .trim()
+                    );
+
+                }
+
+            }
+
+        }
+
+
+        return result;
+
+    }
 
 }

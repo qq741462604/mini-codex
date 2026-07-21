@@ -205,12 +205,27 @@ public class ToolExecutor {
 
 
 
-                results.add(
+                ToolCallResult failed =
                         ToolCallResult.failed(
                                 step.getTool(),
                                 e.getMessage()
-                        )
+                        );
+
+
+                results.add(
+                        failed
                 );
+
+
+                context.getObservations()
+                        .add(
+                                Observation.builder()
+                                        .tool(step.getTool())
+                                        .success(false)
+                                        .input(step.getInput())
+                                        .error(e.getMessage())
+                                        .build()
+                        );
 
 
             }
@@ -332,20 +347,59 @@ public class ToolExecutor {
 
         if(result instanceof FileOperationResult){
 
-            FileOperationResult r =
+
+            FileOperationResult fileResult =
                     (FileOperationResult) result;
 
 
-            if(!r.isSuccess()){
+            if(!fileResult.isSuccess()){
+
 
                 return ToolCallResult.failed(
                         tool,
-                        r.getMessage()
+                        fileResult.getMessage()
+                );
+
+            }
+
+
+            return ToolCallResult.success(
+                    tool,
+                    result
+            );
+
+        }
+
+
+
+
+        if(result instanceof Map){
+
+
+            Map map =
+                    (Map) result;
+
+
+            Object success =
+                    map.get("success");
+
+
+            if(success instanceof Boolean
+                    &&
+                    !((Boolean) success)){
+
+
+                return ToolCallResult.failed(
+                        tool,
+                        String.valueOf(
+                                map.get("message")
+                        )
                 );
 
             }
 
         }
+
 
 
         return ToolCallResult.success(

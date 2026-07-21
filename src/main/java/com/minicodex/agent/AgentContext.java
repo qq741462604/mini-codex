@@ -60,4 +60,12 @@ public class AgentContext {
     @Builder.Default
     private AgentStatus status =
             AgentStatus.IDLE;
+
+    /**
+     * Agent当前执行阶段
+     */
+    @Builder.Default
+    private AgentPhase phase =
+            AgentPhase.ANALYSIS;
+
 }

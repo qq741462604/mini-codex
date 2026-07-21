@@ -13,15 +13,17 @@ import java.util.List;
 public class SkillManager {
 
 
-    private final SkillLoader loader;
+    private final SkillMatcher matcher;
 
 
 
-    public String buildContext(){
+    public String buildContext(
+            String task
+    ){
 
 
         List<Skill> skills =
-                loader.load();
+                matcher.match(task);
 
 
 
@@ -33,15 +35,43 @@ public class SkillManager {
         for(Skill skill:skills){
 
 
-            sb.append("\n## ")
+            sb.append("\n## Skill:")
                     .append(skill.getName())
                     .append("\n");
 
 
-            sb.append(skill.getContent())
-                    .append("\n");
+
+            sb.append("Rules:\n");
+
+
+            for(String rule:
+                    skill.getRules()){
+
+
+                sb.append("- ")
+                        .append(rule)
+                        .append("\n");
+
+            }
+
+
+
+            sb.append("\nForbidden:\n");
+
+
+            for(String f:
+                    skill.getForbidden()){
+
+
+                sb.append("- ")
+                        .append(f)
+                        .append("\n");
+
+            }
+
 
         }
+
 
 
         return sb.toString();
