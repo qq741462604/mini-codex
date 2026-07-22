@@ -5,6 +5,7 @@ import com.minicodex.agent.AgentContext;
 import com.minicodex.agent.AgentPhase;
 import com.minicodex.agent.AgentStatus;
 import com.minicodex.agent.observation.Observation;
+import com.minicodex.agent.phase.PhaseManager;
 import com.minicodex.planner.CodePlan;
 import com.minicodex.planner.Planner;
 import com.minicodex.project.ProjectIndex;
@@ -25,7 +26,7 @@ import java.util.Set;
 public class AgentLoop {
 
 
-    private static final int MAX_ITERATION = 5;
+    private static final int MAX_ITERATION = 10;
 
 
     private final Planner planner;
@@ -35,6 +36,8 @@ public class AgentLoop {
 
 
     private final ProjectIndexer projectIndexer;
+
+    private final PhaseManager phaseManager;
 
 
 
@@ -48,13 +51,7 @@ public class AgentLoop {
                 context.getTask()
         );
 
-        if(context.getPhase()==null){
 
-            context.setPhase(
-                    AgentPhase.ANALYSIS
-            );
-
-        }
 
         context.setStatus(
                 AgentStatus.ANALYZING
@@ -67,12 +64,23 @@ public class AgentLoop {
 
         for(int i=0;i<MAX_ITERATION;i++){
 
+            log.info(
+                    "current phase={}",
+                    context.getPhase()
+            );
 
+            if(context.getPhase()
+                    ==
+                    AgentPhase.FINISH){
 
+                return;
+
+            }
             log.info(
                     "agent iteration={}",
                     i+1
             );
+
 
 
 
@@ -166,13 +174,23 @@ public class AgentLoop {
                     );
 
 
-            updatePhase(
-                    context,
-                    results
-            );
+            AgentPhase nextPhase =
+                    phaseManager.next(
+                            context.getPhase(),
+                            context
+                    );
+
+
             log.info(
-                    "===== TOOL RESULTS ===== {}",
-                    results
+                    "phase change {} -> {}",
+                    context.getPhase(),
+                    nextPhase
+            );
+
+
+
+            context.setPhase(
+                    nextPhase
             );
 
 
@@ -205,13 +223,16 @@ public class AgentLoop {
              * 只有真正修改成功才结束
              *
              */
-            if(hasSuccessfulCodeChange(results)){
+            if(shouldEnterVerifyPhase(results)){
 
                 log.info(
-                        "code changed successfully, finish agent"
+                        "code changed, switch verify"
                 );
 
-                return;
+
+                context.setPhase(
+                        AgentPhase.VERIFY
+                );
 
             }
 
@@ -239,76 +260,13 @@ public class AgentLoop {
 
 
 
-    private void updatePhase(
-            AgentContext context,
-            List<ToolCallResult> results
-    ){
-
-
-        boolean changed=false;
-
-
-        for(ToolCallResult result:results){
-
-
-            if(!result.isSuccess()){
-
-                continue;
-
-            }
-
-
-            String tool =
-                    result.getTool();
-
-
-            if("create_file".equals(tool)
-                    ||
-                    "write_file".equals(tool)
-                    ||
-                    "edit_file".equals(tool)
-            ){
-
-                changed=true;
-
-            }
-
-        }
-
-
-        if(changed){
-
-
-            context.setPhase(
-                    AgentPhase.VERIFY
-            );
-
-
-            return;
-
-        }
-
-
-
-        if(context.getPhase()
-                ==
-                AgentPhase.ANALYSIS){
-
-
-            context.setPhase(
-                    AgentPhase.CODING
-            );
-
-        }
-
-
-    }
 
 
 
 
 
-    private boolean hasSuccessfulCodeChange(
+
+    private boolean shouldEnterVerifyPhase(
             List<ToolCallResult> results
     ){
 
