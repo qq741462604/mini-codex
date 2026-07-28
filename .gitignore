@@ -39,3 +39,6 @@ build/
 
 application-local.yml
 /.idea/
+
+*.json
+/src/main/java/com/minicodex/ademo/

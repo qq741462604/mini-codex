@@ -1,8 +1,10 @@
 package com.minicodex.agent;
 
 
+import com.minicodex.memory.AgentMemoryService;
 import com.minicodex.memory.Memory;
 import com.minicodex.memory.MemoryStore;
+import com.minicodex.memory.MemoryType;
 import com.minicodex.runtime.AgentRuntime;
 import com.minicodex.skill.SkillLoader;
 import com.minicodex.trace.AgentTrace;
@@ -12,6 +14,8 @@ import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
 
 
 @Data
@@ -30,15 +34,21 @@ public class Agent {
 
 
     private MemoryStore memoryStore;
-
+    private AgentMemoryService memoryService;
     private TraceService traceService;
     private SkillLoader skillLoader;
 
     public AgentResult run(
             String task
     ) {
-        AgentTrace trace =
-                traceService.start(task);
+        AgentTrace trace = null;
+
+        if(traceService!=null){
+
+            trace =
+                    traceService.start(task);
+
+        }
         AgentResult result;
         try {
 
@@ -56,7 +66,7 @@ public class Agent {
                                             ?
                                             new ArrayList<>()
                                             :
-                                            memoryStore.query(task)
+                                            safeMemoryQuery(task)
                             )
                             .observations(
                                     new ArrayList<>()
@@ -75,19 +85,30 @@ public class Agent {
                     context.getTrace()
             );
 
+            if(runtime==null){
+
+                return AgentResult.failed(
+                        "AgentRuntime is null"
+                );
+
+            }
             result =
                     runtime.execute(
                             context
                     );
 
-            memoryStore.save(
-                    Memory.builder()
-                            .key(task)
-                            .content(
-                                    result.getMessage()
-                            )
-                            .build()
-            );
+
+            if(memoryService!=null
+                    &&
+                    result!=null){
+
+                memoryService.saveTask(
+                        task,
+                        result.getMessage()
+                );
+
+            }
+
 
         } catch (Exception e) {
             log.error(
@@ -102,7 +123,13 @@ public class Agent {
         } finally {
 
 
-            traceService.finish(trace);
+            if(traceService!=null
+                    &&
+                    trace!=null){
+
+                traceService.finish(trace);
+
+            }
 
         }
 
@@ -112,5 +139,19 @@ public class Agent {
 
     }
 
+    private List<Memory> safeMemoryQuery(
+            String task
+    ){
 
+        List<Memory> memories =
+                memoryStore.query(task);
+
+
+        return memories==null
+                ?
+                new ArrayList<>()
+                :
+                memories;
+
+    }
 }

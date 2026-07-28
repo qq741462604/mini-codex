@@ -1,6 +1,7 @@
 package com.minicodex.agent.phase;
 
 
+import com.minicodex.agent.AgentContext;
 import com.minicodex.agent.AgentPhase;
 import org.springframework.stereotype.Component;
 
@@ -28,7 +29,7 @@ public class PhaseManager {
 
     public AgentPhase next(
             AgentPhase current,
-            com.minicodex.agent.AgentContext context
+            AgentContext context
     ){
 
 

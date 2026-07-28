@@ -6,7 +6,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -14,6 +13,9 @@ public class VerifyEngine {
 
 
     private final CodeValidator validator;
+
+
+    private final VerifyFileLoader loader;
 
 
 
@@ -24,6 +26,11 @@ public class VerifyEngine {
 
         log.info(
                 "===== VERIFY START ====="
+        );
+
+
+        loader.loadChangedFiles(
+                context
         );
 
 
@@ -54,7 +61,6 @@ public class VerifyEngine {
             return VerifyResult.success();
 
         }
-
 
 
         log.warn(

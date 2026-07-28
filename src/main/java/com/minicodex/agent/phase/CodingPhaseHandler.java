@@ -27,10 +27,8 @@ public class CodingPhaseHandler
             AgentContext context
     ){
 
-
-
         boolean changed =
-                context.getObservations()
+                context.getLastObservations()
                         .stream()
                         .anyMatch(
                                 o ->
@@ -44,6 +42,8 @@ public class CodingPhaseHandler
                                                 &&
                                                 o.isSuccess()
                         );
+
+
 
 
 

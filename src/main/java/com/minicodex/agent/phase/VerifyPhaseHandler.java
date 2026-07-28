@@ -3,14 +3,13 @@ package com.minicodex.agent.phase;
 
 import com.minicodex.agent.AgentContext;
 import com.minicodex.agent.AgentPhase;
+import com.minicodex.verify.VerifyResult;
 import org.springframework.stereotype.Component;
-
 
 
 @Component
 public class VerifyPhaseHandler
         implements AgentPhaseHandler {
-
 
 
     @Override
@@ -26,18 +25,33 @@ public class VerifyPhaseHandler
     public AgentPhase next(
             AgentContext context
     ){
+        Object result =
+                context.getVariables()
+                        .get("verify_result");
 
 
-        /*
-         *
-         * 后面接 Validator
-         *
-         */
+        if(result==null){
+
+            return AgentPhase.VERIFY;
+
+        }
+
+        VerifyResult verifyResult =
+                (VerifyResult)result;
 
 
-        return AgentPhase.FINISH;
+        if(verifyResult.isSuccess()){
+
+            return AgentPhase.FINISH;
+
+        }
+
+
+        return AgentPhase.REPAIR;
+
+
+
 
     }
-
 
 }

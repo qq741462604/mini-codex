@@ -4,12 +4,13 @@ package com.minicodex.runtime;
 import com.minicodex.agent.AgentContext;
 import com.minicodex.agent.AgentPhase;
 import com.minicodex.agent.AgentStatus;
-import com.minicodex.agent.observation.Observation;
 import com.minicodex.agent.phase.PhaseManager;
 import com.minicodex.planner.CodePlan;
 import com.minicodex.planner.Planner;
 import com.minicodex.project.ProjectIndex;
 import com.minicodex.project.ProjectIndexer;
+import com.minicodex.verify.VerifyEngine;
+import com.minicodex.verify.VerifyResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -18,6 +19,7 @@ import org.springframework.stereotype.Component;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+
 
 
 @Slf4j
@@ -37,7 +39,11 @@ public class AgentLoop {
 
     private final ProjectIndexer projectIndexer;
 
+
     private final PhaseManager phaseManager;
+
+
+    private final VerifyEngine verifyEngine;
 
 
 
@@ -57,6 +63,7 @@ public class AgentLoop {
                 AgentStatus.ANALYZING
         );
 
+
         Set<String> executedPlans =
                 new HashSet<>();
 
@@ -64,23 +71,92 @@ public class AgentLoop {
 
         for(int i=0;i<MAX_ITERATION;i++){
 
+
             log.info(
-                    "current phase={}",
+                    "iteration={} phase={}",
+                    i + 1,
                     context.getPhase()
             );
+
+
 
             if(context.getPhase()
                     ==
                     AgentPhase.FINISH){
 
+
+                log.info(
+                        "agent already finish"
+                );
+
+
                 return;
 
             }
-            log.info(
-                    "agent iteration={}",
-                    i+1
-            );
 
+
+
+            /*
+             *
+             * VERIFY阶段单独处理
+             *
+             */
+            if(context.getPhase()
+                    ==
+                    AgentPhase.VERIFY){
+
+
+                VerifyResult verifyResult =
+                        verifyEngine.verify(
+                                context
+                        );
+
+
+                if(verifyResult.isSuccess()){
+
+
+                    context.setPhase(
+                            AgentPhase.FINISH
+                    );
+
+
+                    log.info(
+                            "verify success finish"
+                    );
+
+
+                    return;
+
+
+                }else{
+
+
+                    context.setPhase(
+                            AgentPhase.REPAIR
+                    );
+
+
+                    context.getVerifyErrors()
+                            .clear();
+
+
+                    context.getVerifyErrors()
+                            .addAll(
+                                    verifyResult.getErrors()
+                            );
+
+
+                    log.warn(
+                            "verify failed errors={}",
+                            verifyResult.getErrors()
+                    );
+
+
+                    continue;
+
+                }
+
+            }
 
 
 
@@ -105,6 +181,7 @@ public class AgentLoop {
                         e
                 );
 
+
                 return;
 
             }
@@ -120,12 +197,25 @@ public class AgentLoop {
                     plan.getSteps().isEmpty()){
 
 
+
                 log.info(
-                        "empty plan finish"
+                        "empty plan"
                 );
 
 
-                return;
+                AgentPhase next =
+                        phaseManager.next(
+                                context.getPhase(),
+                                context
+                        );
+
+
+                context.setPhase(
+                        next
+                );
+
+
+                continue;
 
             }
 
@@ -142,7 +232,8 @@ public class AgentLoop {
 
 
                 log.warn(
-                        "duplicate plan detected, stop"
+                        "duplicate plan detected {}",
+                        planKey
                 );
 
 
@@ -159,10 +250,9 @@ public class AgentLoop {
 
 
             log.info(
-                    "plan={}",
+                    "execute plan={}",
                     plan
             );
-
 
 
 
@@ -174,24 +264,13 @@ public class AgentLoop {
                     );
 
 
-            AgentPhase nextPhase =
-                    phaseManager.next(
-                            context.getPhase(),
-                            context
-                    );
-
 
             log.info(
-                    "phase change {} -> {}",
-                    context.getPhase(),
-                    nextPhase
+                    "tool results={}",
+                    results
             );
 
 
-
-            context.setPhase(
-                    nextPhase
-            );
 
 
 
@@ -217,30 +296,36 @@ public class AgentLoop {
 
 
 
+
             /*
              *
-             * 核心：
-             * 只有真正修改成功才结束
+             * 根据当前阶段和执行结果推进状态
              *
              */
-            if(shouldEnterVerifyPhase(results)){
-
-                log.info(
-                        "code changed, switch verify"
-                );
+            AgentPhase current =
+                    context.getPhase();
 
 
-                context.setPhase(
-                        AgentPhase.VERIFY
-                );
 
-            }
+            AgentPhase next =
+                    phaseManager.next(
+                            current,
+                            context
+                    );
+
 
 
             log.info(
-                    "no code change, continue next iteration"
+                    "phase change {} -> {}",
+                    current,
+                    next
             );
 
+
+
+            context.setPhase(
+                    next
+            );
 
 
 
@@ -253,60 +338,6 @@ public class AgentLoop {
                 "agent reach max iteration"
         );
 
-    }
-
-
-
-
-
-
-
-
-
-
-
-
-    private boolean shouldEnterVerifyPhase(
-            List<ToolCallResult> results
-    ){
-
-
-
-        for(ToolCallResult result:results){
-
-
-            if(!result.isSuccess()){
-
-                continue;
-
-            }
-
-
-
-            String tool =
-                    result.getTool();
-
-
-
-            if(
-                    "create_file".equals(tool)
-                            ||
-                            "write_file".equals(tool)
-                            ||
-                            "edit_file".equals(tool)
-            ){
-
-
-                return true;
-
-            }
-
-
-        }
-
-
-
-        return false;
 
     }
 

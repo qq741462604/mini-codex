@@ -3,6 +3,7 @@ package com.minicodex.runtime;
 
 import com.minicodex.agent.AgentContext;
 import com.minicodex.agent.observation.Observation;
+import com.minicodex.agent.policy.AgentPolicy;
 import com.minicodex.planner.CodePlan;
 import com.minicodex.planner.PlanStep;
 import com.minicodex.tool.AgentTool;
@@ -27,12 +28,16 @@ public class ToolExecutor {
     private final ToolRegistry toolRegistry;
 
 
-
+    private final AgentPolicy agentPolicy;
 
     public List<ToolCallResult> execute(
             CodePlan plan,
             AgentContext context
     ){
+
+        int beforeSize =
+                context.getObservations()
+                        .size();
 
 
         List<ToolCallResult> results =
@@ -42,7 +47,11 @@ public class ToolExecutor {
 
         for(PlanStep step:plan.getSteps()){
 
-
+            log.info(
+                    "execute tool={} phase={}",
+                    step.getTool(),
+                    context.getPhase()
+            );
 
             /*
              *
@@ -79,7 +88,32 @@ public class ToolExecutor {
 
             }
 
+            if(!agentPolicy.allow(
+                    context.getPhase(),
+                    step.getTool()
+            )){
 
+
+                log.warn(
+                        "tool blocked phase={} tool={}",
+                        context.getPhase(),
+                        step.getTool()
+                );
+
+
+                results.add(
+                        ToolCallResult.failed(
+                                step.getTool(),
+                                "tool not allowed in phase "
+                                        +
+                                        context.getPhase()
+                        )
+                );
+
+
+                continue;
+
+            }
 
 
             AgentTool tool =
@@ -185,12 +219,14 @@ public class ToolExecutor {
                                         .build()
                         );
 
-                log.info(
-                        "tool={} success={} result={}",
-                        step.getTool(),
-                        callResult.isSuccess(),
-                        result
-                );
+//                log.info(
+//                        "tool={} success={} result={}",
+//                        step.getTool(),
+//                        callResult.isSuccess(),
+//                        result
+//                );
+
+
 
 
 
@@ -233,7 +269,19 @@ public class ToolExecutor {
 
         }
 
+        List<Observation> currentObservations =
+                context.getObservations()
+                        .subList(
+                                beforeSize,
+                                context.getObservations().size()
+                        );
 
+
+        context.setLastObservations(
+                new ArrayList<>(
+                        currentObservations
+                )
+        );
 
         return results;
 

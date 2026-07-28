@@ -1,6 +1,7 @@
 package com.minicodex.agent;
 
 
+import com.minicodex.agent.knowledge.KnowledgeContext;
 import com.minicodex.agent.observation.Observation;
 import com.minicodex.memory.Memory;
 import com.minicodex.planner.CodePlan;
@@ -46,11 +47,16 @@ public class AgentContext {
     @Builder.Default
     private List<Memory> memories =
             new ArrayList<>();
+
+    private KnowledgeContext knowledge;
     /**
      * 工具观察结果
      */
     @Builder.Default
     private List<Observation> observations =
+            new ArrayList<>();
+    @Builder.Default
+    private List<Observation> lastObservations =
             new ArrayList<>();
 
     @Builder.Default
@@ -67,5 +73,12 @@ public class AgentContext {
     @Builder.Default
     private AgentPhase phase =
             AgentPhase.ANALYSIS;
+
+    /**
+     * 验证失败原因
+     */
+    @Builder.Default
+    private List<String> verifyErrors =
+            new ArrayList<>();
 
 }

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.minicodex.agent.AgentContext;
+import com.minicodex.agent.observation.Observation;
 import com.minicodex.llm.LlmClient;
 import com.minicodex.project.ProjectContextService;
 import com.minicodex.prompt.PromptLoader;
@@ -91,17 +92,27 @@ public class QwenPlanner
                         .name()
         );
 
-
+        vars.put(
+                "PHASE_RULES",
+                buildPhaseRules(
+                        context
+                )
+        );
         try {
             vars.put(
                     "OBSERVATIONS",
                     objectMapper.writeValueAsString(
-                            context.getObservations()
+                            getPlannerObservations(context)
                     )
             );
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
         }
+
+        vars.put(
+                "VERIFY_ERRORS",
+                buildVerifyErrors(context)
+        );
 
         vars.put(
                 "PROJECT_INDEX",
@@ -244,6 +255,125 @@ public class QwenPlanner
 
     }
 
+
+    private String buildPhaseRules(
+            AgentContext context
+    ){
+
+        switch(context.getPhase()){
+
+
+            case ANALYSIS:
+
+                return
+                        "当前阶段 ANALYSIS\n"
+                                +
+                                "允许工具:\n"
+                                +
+                                "- list_files\n"
+                                +
+                                "- search_code\n"
+                                +
+                                "- read_file\n"
+                                +
+                                "目标:分析项目，不修改代码";
+
+
+            case CODING:
+
+                return
+                        "当前阶段 CODING\n"
+                                +
+                                "允许工具:\n"
+                                +
+                                "- create_file\n"
+                                +
+                                "- write_file\n"
+                                +
+                                "- edit_file\n"
+                                +
+                                "目标:执行代码修改";
+
+
+            case VERIFY:
+
+                return
+                        "当前阶段 VERIFY\n"
+                                +
+                                "禁止修改代码\n"
+                                +
+                                "只能:\n"
+                                +
+                                "- read_file\n"
+                                +
+                                "- search_code\n";
+
+
+            case REPAIR:
+
+                return
+                        "当前阶段 REPAIR\n"
+                                +
+                                "根据验证错误修复代码\n"
+                                +
+                                "允许:\n"
+                                +
+                                "- edit_file\n"
+                                +
+                                "- write_file";
+
+
+            case FINISH:
+
+                return
+                        "任务已经完成，不生成任何tool";
+
+
+            default:
+
+                return "";
+
+        }
+
+    }
+
+
+    private List<Observation> getPlannerObservations(
+            AgentContext context
+    ){
+
+        if(context.getLastObservations()!=null
+                &&
+                !context.getLastObservations().isEmpty()){
+
+
+            return context.getLastObservations();
+
+        }
+
+
+        return context.getObservations();
+
+    }
+
+    private String buildVerifyErrors(
+            AgentContext context
+    ){
+
+
+        if(context.getVerifyErrors()==null){
+
+            return "";
+
+        }
+
+
+        return String.join(
+                "\n",
+                context.getVerifyErrors()
+        );
+
+    }
 
     private String buildProjectIndex(
             AgentContext context

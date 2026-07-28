@@ -7,7 +7,6 @@ import lombok.Data;
 import java.util.ArrayList;
 import java.util.List;
 
-
 @Data
 @Builder
 public class VerifyResult {
@@ -21,6 +20,14 @@ public class VerifyResult {
             new ArrayList<>();
 
 
+    /**
+     * 失败文件
+     */
+    @Builder.Default
+    private List<String> failedFiles =
+            new ArrayList<>();
+
+
 
     public static VerifyResult success(){
 
@@ -29,7 +36,6 @@ public class VerifyResult {
                 .build();
 
     }
-
 
 
     public static VerifyResult failed(

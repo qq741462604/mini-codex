@@ -204,15 +204,15 @@ public class SkillLoader {
 
 
 
-            if(line.startsWith("keywords")){
+            if(line.toLowerCase()
+                    .startsWith("keywords")){
 
                 mode="keywords";
                 continue;
-
             }
 
 
-            if(line.startsWith("rules")){
+            if(line.toLowerCase().startsWith("rules")){
 
                 mode="rules";
                 continue;
@@ -220,7 +220,7 @@ public class SkillLoader {
             }
 
 
-            if(line.startsWith("forbidden")){
+            if(line.toLowerCase().startsWith("forbidden")){
 
                 mode="forbidden";
                 continue;
