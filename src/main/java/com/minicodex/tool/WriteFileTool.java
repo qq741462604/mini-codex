@@ -4,6 +4,7 @@ package com.minicodex.tool;
 import com.minicodex.agent.AgentContext;
 import com.minicodex.workspace.WorkspaceService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 
@@ -12,7 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 
 
-
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class WriteFileTool
@@ -35,11 +36,9 @@ public class WriteFileTool
     @Override
     public String description(){
 
-        return "overwrite file content";
+        return "create or modify file";
 
     }
-
-
 
 
 
@@ -55,13 +54,6 @@ public class WriteFileTool
 
 
 
-        /*
-         *
-         * 关键修改
-         *
-         * 不允许直接 new File(path)
-         *
-         */
         File file =
                 workspaceService.resolve(
                         toolInput.getPath()
@@ -69,61 +61,259 @@ public class WriteFileTool
 
 
 
-        File parent =
-                file.getParentFile();
-
-
-
-        if(parent!=null
+        if(file.getParentFile()!=null
                 &&
-                !parent.exists()){
+                !file.getParentFile().exists()){
 
 
-            parent.mkdirs();
+            file.getParentFile()
+                    .mkdirs();
 
         }
 
 
 
-        boolean exists =
-                file.exists();
+        String content;
+
+
+
+        /*
+         *
+         * 修改已有文件
+         *
+         */
+        if(toolInput.getOldText()!=null
+                &&
+                !toolInput.getOldText().isEmpty()){
+
+
+            content =
+                    new String(
+                            Files.readAllBytes(
+                                    file.toPath()
+                            ),
+                            StandardCharsets.UTF_8
+                    );
+            if(toolInput.getNewText()==null){
+                throw new RuntimeException(
+                        "newText is null"
+                );
+            }
+
+            String source =
+                    normalize(content);
+
+
+            String old =
+                    normalize(toolInput.getOldText());
+
+
+            if(!source.contains(old)){
+
+                log.error(
+                        "oldText not found\noldText={}",
+                        toolInput.getOldText()
+                );
+
+                throw new RuntimeException(
+                        "oldText not found"
+                );
+
+            }
+
+            content =
+                    replaceIgnoreFormat(
+                            content,
+                            toolInput.getOldText(),
+                            toolInput.getNewText()
+                    );
+
+
+
+
+
+        }else{
+
+
+            content = toolInput.getContent();
+
+
+            if(content==null
+                    &&
+                    toolInput.getNewText()!=null){
+
+
+                throw new RuntimeException(
+                        "oldText missing but newText exists"
+                );
+
+            }
+
+
+            if(content==null){
+
+                throw new RuntimeException(
+                        "write content is null"
+                );
+
+            }
+
+        }
 
 
 
         Files.write(
                 file.toPath(),
-                toolInput.getContent()
-                        .getBytes(
-                                StandardCharsets.UTF_8
-                        )
+                content.getBytes(
+                        StandardCharsets.UTF_8
+                )
         );
 
 
 
-
         return FileOperationResult.builder()
+
                 .action(
-                        exists
+                        file.exists()
                                 ?
                                 "update"
                                 :
                                 "create"
                 )
+
                 .path(
                         workspaceService.relativePath(file)
                 )
+
                 .success(true)
+
                 .message(
-                        exists
-                                ?
-                                "overwrite success"
-                                :
-                                "create success"
+                        "write success"
                 )
+
                 .build();
 
 
     }
 
+    private String replaceIgnoreFormat(
+            String source,
+            String oldText,
+            String newText
+    ){
 
+
+        String normalizedSource =
+                normalize(source);
+
+
+        String normalizedOld =
+                normalize(oldText);
+
+
+
+        int index =
+                normalizedSource.indexOf(
+                        normalizedOld
+                );
+
+
+        if(index < 0){
+
+            throw new RuntimeException(
+                    "oldText not found"
+            );
+
+        }
+
+
+        // 找原始文本位置
+        int start =
+                findOriginalIndex(
+                        source,
+                        oldText
+                );
+
+
+        if(start < 0){
+
+            throw new RuntimeException(
+                    "original oldText not found"
+            );
+
+        }
+
+
+        return source.substring(0,start)
+                +
+                newText
+                +
+                source.substring(
+                        start + oldText.length()
+                );
+
+    }
+
+
+
+    private int findOriginalIndex(
+            String source,
+            String oldText
+    ){
+
+
+        StringBuilder current =
+                new StringBuilder();
+
+
+        for(int i=0;i<source.length();i++){
+
+
+            char c =
+                    source.charAt(i);
+
+
+            if(c=='\r'){
+
+                continue;
+
+            }
+
+
+            if(c=='\t'){
+
+                current.append(" ");
+
+            }else{
+
+                current.append(c);
+
+            }
+
+
+            if(normalize(
+                    current.toString()
+            ).endsWith(
+                    normalize(oldText)
+            )){
+
+                return i-oldText.length()+1;
+
+            }
+
+        }
+
+
+        return -1;
+
+    }
+
+    private String normalize(String text){
+
+        return text
+                .replace("\r\n","\n")
+                .replaceAll("[\\t ]+"," ")
+                .trim();
+
+    }
 }

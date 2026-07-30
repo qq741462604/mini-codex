@@ -5,6 +5,8 @@ logging:
   level:
     com.minicodex.trace: INFO
 
+minicodex:
+  home: D:/ideaProject/AI/code-auto/mini-codex
 codex:
   workspace:
     root: D:/ideaProject/test

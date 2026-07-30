@@ -18,14 +18,11 @@ public class SimplePlanner
             AgentContext context
     ){
 
+        ToolInput input = ToolInput.builder()
+                .path(".").
+                build();
 
-        ToolInput input =
-                new ToolInput();
 
-
-        input.setPath(
-                "."
-        );
 
 
 

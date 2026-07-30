@@ -47,7 +47,11 @@ public class QwenPlanner
     public CodePlan createPlan(
             AgentContext context
     ) {
-
+        log.info(
+                "task={}, phase={}",
+                context.getTask(),
+                context.getPhase()
+        );
 
         String template =
                 promptLoader.load(
@@ -67,7 +71,10 @@ public class QwenPlanner
                         context.getTask()
                 );
 
-
+        log.info(
+                "skill context length={}",
+                matchedSkills == null ? 0 : matchedSkills.length()
+        );
         log.info(
                 "========== MATCHED SKILLS ==========\n{}",
                 matchedSkills
@@ -110,6 +117,10 @@ public class QwenPlanner
         }
 
         vars.put(
+                "LAST_ACTION",
+                buildLastAction(context)
+        );
+        vars.put(
                 "VERIFY_ERRORS",
                 buildVerifyErrors(context)
         );
@@ -125,7 +136,15 @@ public class QwenPlanner
                         vars
                 );
 
+        log.info(
+                "planner prompt length={}",
+                prompt.length()
+        );
 
+        log.debug(
+                "planner prompt={}",
+                prompt
+        );
         String response =
                 llmClient.chat(
                         prompt
@@ -255,6 +274,63 @@ public class QwenPlanner
 
     }
 
+    private String buildLastAction(
+            AgentContext context
+    ){
+
+        if(context.getObservations()==null
+                ||
+                context.getObservations().isEmpty()){
+
+            return "当前没有执行任何工具";
+
+        }
+
+
+        Observation last =
+                context.getObservations()
+                        .get(
+                                context.getObservations().size()-1
+                        );
+
+
+        StringBuilder sb =
+                new StringBuilder();
+
+
+        sb.append("最近一次执行:\n");
+
+        sb.append("tool=")
+                .append(last.getTool())
+                .append("\n");
+
+
+        sb.append("success=")
+                .append(last.isSuccess())
+                .append("\n");
+
+
+
+        if("read_file".equals(last.getTool())
+                &&
+                last.isSuccess()){
+
+            sb.append("\n");
+            sb.append(
+                    "Skill目标文件已经读取完成。\n"
+            );
+            sb.append(
+                    "禁止再次调用search_code/read_file。\n"
+            );
+            sb.append(
+                    "下一步只能调用write_file。\n"
+            );
+        }
+
+
+        return sb.toString();
+
+    }
 
     private String buildPhaseRules(
             AgentContext context
@@ -284,15 +360,18 @@ public class QwenPlanner
                 return
                         "当前阶段 CODING\n"
                                 +
+                                "如果存在Skill:\n"
+                                +
+                                "必须执行Skill Implementation\n"
+                                +
+                                "禁止自行设计架构\n"
+                                +
+                                "禁止创建Skill未要求文件\n"
+                                +
                                 "允许工具:\n"
                                 +
-                                "- create_file\n"
-                                +
-                                "- write_file\n"
-                                +
-                                "- edit_file\n"
-                                +
-                                "目标:执行代码修改";
+                                "- write_file\n";
+
 
 
             case VERIFY:

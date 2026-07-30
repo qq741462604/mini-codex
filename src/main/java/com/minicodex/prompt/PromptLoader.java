@@ -1,7 +1,7 @@
 package com.minicodex.prompt;
 
 
-import com.minicodex.workspace.WorkspaceService;
+import com.minicodex.config.AgentHomeService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -17,7 +17,7 @@ import java.nio.file.Files;
 public class PromptLoader {
 
 
-    private final WorkspaceService workspaceService;
+    private final AgentHomeService agentHomeService;
 
 
 
@@ -27,7 +27,7 @@ public class PromptLoader {
 
 
         File file =
-                workspaceService.resolve(
+                agentHomeService.resolve(
                         ".ai/prompts/"
                                 + name
                                 + ".md"
@@ -36,9 +36,11 @@ public class PromptLoader {
 
         if(!file.exists()){
 
+
             throw new RuntimeException(
                     "prompt not found:"
-                            + file.getAbsolutePath()
+                            +
+                            file.getAbsolutePath()
             );
 
         }

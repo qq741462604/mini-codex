@@ -4,6 +4,7 @@ package com.minicodex.llm;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -13,7 +14,7 @@ import okhttp3.*;
 import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 
-
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class QwenClient
@@ -28,10 +29,20 @@ public class QwenClient
 //    private final OkHttpClient client =
 //            new OkHttpClient();
 
-    private final OkHttpClient client =
+    private OkHttpClient client =
             new OkHttpClient.Builder()
-                    .connectTimeout(30, TimeUnit.SECONDS)
-                    .readTimeout(60, TimeUnit.SECONDS)
+                    .connectTimeout(
+                            30,
+                            TimeUnit.SECONDS
+                    )
+                    .readTimeout(
+                            120,
+                            TimeUnit.SECONDS
+                    )
+                    .writeTimeout(
+                            30,
+                            TimeUnit.SECONDS
+                    )
                     .build();
 
 
@@ -166,7 +177,13 @@ public class QwenClient
 
 
         }catch(Exception e){
-
+            log.error(
+                    "qwen call failed url={} model={} timeout={}ms",
+                    url,
+                    model,
+                    120000,
+                    e
+            );
 
             throw new RuntimeException(
                     "call qwen failed",

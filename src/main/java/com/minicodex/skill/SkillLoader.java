@@ -1,8 +1,10 @@
 package com.minicodex.skill;
 
 
+import com.minicodex.config.AgentHomeService;
 import com.minicodex.workspace.WorkspaceService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 
@@ -14,10 +16,11 @@ import java.util.List;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class SkillLoader {
 
 
-    private final WorkspaceService workspaceService;
+    private final AgentHomeService agentHomeService;
 
 
 
@@ -29,9 +32,14 @@ public class SkillLoader {
 
 
         File skillDir =
-                workspaceService.resolve(
+                agentHomeService.resolve(
                         ".ai/skills"
                 );
+
+        log.info(
+                "load skill path={}",
+                skillDir.getAbsolutePath()
+        );
 
 
         if(!skillDir.exists()){
@@ -55,11 +63,16 @@ public class SkillLoader {
 
 
 
+
     private void scan(
             File file,
             List<Skill> result
     ){
 
+        log.info(
+                "scan file={}",
+                file.getAbsolutePath()
+        );
 
         if(file.isDirectory()){
 
@@ -97,6 +110,10 @@ public class SkillLoader {
         }
 
 
+        log.info(
+                "load skill file={}",
+                file.getAbsolutePath()
+        );
 
 
         result.add(
@@ -227,7 +244,21 @@ public class SkillLoader {
 
             }
 
+            if(line.toLowerCase()
+                    .startsWith("implementation")){
+                mode="implementation";
+                continue;
+            }
 
+
+            if(line.toLowerCase()
+                    .startsWith("target")){
+
+                mode="target";
+
+                continue;
+
+            }
 
             if(line.startsWith("#")){
 
@@ -241,7 +272,7 @@ public class SkillLoader {
 
 
                 skill.getKeywords()
-                        .add(line);
+                        .add(cleanLine(line));
 
 
             }
@@ -268,8 +299,80 @@ public class SkillLoader {
             }
 
 
+            if("implementation".equals(mode)){
+
+                skill.getImplementation()
+                        .add(line);
+
+            }
+            if("target".equals(mode)){
+
+
+                if(line.startsWith("class")){
+
+
+                    String value =
+                            line.substring(
+                                            line.indexOf(":")+1
+                                    )
+                                    .trim();
+
+
+                    if(skill.getTarget()==null){
+
+                        skill.setTarget(
+                                new SkillTarget()
+                        );
+
+                    }
+
+
+                    skill.getTarget()
+                            .setClassName(value);
+
+
+                }
+
+
+
+                if(line.startsWith("method")){
+
+
+                    String value =
+                            line.substring(
+                                            line.indexOf(":")+1
+                                    )
+                                    .trim();
+
+
+                    if(skill.getTarget()==null){
+
+                        skill.setTarget(
+                                new SkillTarget()
+                        );
+
+                    }
+
+
+                    skill.getTarget()
+                            .setMethodName(value);
+
+
+                }
+
+            }
         }
 
+
+    }
+
+
+    private String cleanLine(
+            String line
+    ){
+
+        return line.replace("-","")
+                .trim();
 
     }
 

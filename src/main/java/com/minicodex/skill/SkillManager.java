@@ -2,12 +2,13 @@ package com.minicodex.skill;
 
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 
 import java.util.List;
 
-
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class SkillManager {
@@ -25,7 +26,10 @@ public class SkillManager {
         List<Skill> skills =
                 matcher.match(task);
 
-
+        log.info(
+                "loaded skills size={}",
+                skills.size()
+        );
 
         StringBuilder sb =
                 new StringBuilder();
@@ -33,13 +37,42 @@ public class SkillManager {
 
 
         for(Skill skill:skills){
-
+            log.info(
+                    "skill name={} keywords={}",
+                    skill.getName(),
+                    skill.getKeywords()
+            );
 
             sb.append("\n## Skill:")
                     .append(skill.getName())
                     .append("\n");
 
+            if(skill.getTarget()!=null){
 
+
+                sb.append("\nTarget:\n");
+
+
+                sb.append(
+                                "class="
+                        )
+                        .append(
+                                skill.getTarget()
+                                        .getClassName()
+                        )
+                        .append("\n");
+
+
+                sb.append(
+                                "method="
+                        )
+                        .append(
+                                skill.getTarget()
+                                        .getMethodName()
+                        )
+                        .append("\n");
+
+            }
 
             sb.append("Rules:\n");
 
@@ -55,7 +88,17 @@ public class SkillManager {
             }
 
 
+            sb.append("\n请严格执行以下Implementation:\n");
 
+
+            for(String item:
+                    skill.getImplementation()){
+
+
+                sb.append(item)
+                        .append("\n");
+
+            }
             sb.append("\nForbidden:\n");
 
 

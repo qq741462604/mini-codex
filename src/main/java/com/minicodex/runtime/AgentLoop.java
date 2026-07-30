@@ -4,11 +4,14 @@ package com.minicodex.runtime;
 import com.minicodex.agent.AgentContext;
 import com.minicodex.agent.AgentPhase;
 import com.minicodex.agent.AgentStatus;
+import com.minicodex.agent.observation.Observation;
 import com.minicodex.agent.phase.PhaseManager;
 import com.minicodex.planner.CodePlan;
+import com.minicodex.planner.PlanStep;
 import com.minicodex.planner.Planner;
 import com.minicodex.project.ProjectIndex;
 import com.minicodex.project.ProjectIndexer;
+import com.minicodex.tool.ToolInput;
 import com.minicodex.verify.VerifyEngine;
 import com.minicodex.verify.VerifyResult;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -161,30 +165,12 @@ public class AgentLoop {
 
 
 
-            CodePlan plan;
+            CodePlan plan = planner.createPlan(context);
 
 
-            try{
 
 
-                plan =
-                        planner.createPlan(
-                                context
-                        );
 
-
-            }catch(Exception e){
-
-
-                log.error(
-                        "planner failed",
-                        e
-                );
-
-
-                return;
-
-            }
 
 
 
@@ -196,11 +182,27 @@ public class AgentLoop {
                     ||
                     plan.getSteps().isEmpty()){
 
-
-
-                log.info(
-                        "empty plan"
+                log.warn(
+                        "empty plan phase={}",
+                        context.getPhase()
                 );
+
+                if(context.getPhase()
+                        == AgentPhase.CODING){
+
+                    log.error(
+                            "CODING phase but planner returned empty plan, stop"
+                    );
+
+                    context.setPhase(
+                            AgentPhase.FINISH
+                    );
+
+                    return;
+
+                }
+
+
 
 
                 AgentPhase next =
@@ -340,6 +342,9 @@ public class AgentLoop {
 
 
     }
+
+
+
 
 
 }

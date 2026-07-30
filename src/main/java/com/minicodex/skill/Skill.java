@@ -47,5 +47,14 @@ public class Skill {
             new ArrayList<>();
 
 
+    private List<String> implementation =
+            new ArrayList<>();
+
+    /**
+     * Skill指定修改目标
+     */
+    private SkillTarget target;
+
+    private String template;
 
 }

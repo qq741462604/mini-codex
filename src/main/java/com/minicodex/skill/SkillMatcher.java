@@ -18,20 +18,25 @@ public class SkillMatcher {
     private final SkillLoader loader;
 
 
+    private List<Skill> cache;
+
+
 
     public List<Skill> match(
             String task
     ){
 
 
-        List<Skill> skills =
-                loader.load();
+        if(cache==null){
 
+            cache =
+                    loader.load();
+
+        }
 
 
         List<Skill> result =
                 new ArrayList<>();
-
 
 
         if(task==null){
@@ -41,14 +46,12 @@ public class SkillMatcher {
         }
 
 
-
         String text =
                 task.toLowerCase();
 
 
 
-        for(Skill skill:skills){
-
+        for(Skill skill:cache){
 
 
             for(String keyword:
@@ -62,11 +65,9 @@ public class SkillMatcher {
 
                     result.add(skill);
 
-
                     break;
 
                 }
-
 
             }
 
@@ -75,7 +76,6 @@ public class SkillMatcher {
 
 
         return result;
-
 
     }
 

@@ -63,12 +63,10 @@ public class VerifyFileLoader {
 
 
                 ToolInput input =
-                        new ToolInput();
+                        ToolInput.builder().path(path).build();
 
 
-                input.setPath(
-                        path
-                );
+
 
 
                 Object result =

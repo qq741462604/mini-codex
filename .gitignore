@@ -41,4 +41,4 @@ application-local.yml
 /.idea/
 
 *.json
-/src/main/java/com/minicodex/ademo/
+/src/main/java/com/minicodex/template/
