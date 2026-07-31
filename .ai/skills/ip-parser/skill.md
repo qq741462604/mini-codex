@@ -1,34 +1,38 @@
-
-- name: ip解析增强
-
-
-  target:
-
-    class:
-      DataPrepEventHandler
+name:
+ip解析增强
 
 
-    method:
-      handle
+keywords:
+IP
+ip
+解析
 
 
-  Implementation:
+target:
+
+class: DataPrepEventHandler
+
+method: handle
 
 
-  必须新增以下代码:
+implementation:
 
-  1. handle方法中:
+必须新增以下代码:
 
-  原:
+1. handle方法中:
 
-  Map<String, Object> eventFields = eventData.getData();
+原:
+
+Map<String, Object> eventFields = eventData.getData();
 
 
-  后:
+后:
 
-  Map<String, Object> eventFields = eventData.getData();
+Map<String, Object> eventFields = eventData.getData();
 
-  getIpInfo(eventData);
+getIpInfo(eventData);
+
+
 
   
 

@@ -177,7 +177,13 @@ public class SkillLoader {
             parseSections(
                     skill
             );
-
+            log.info(
+                    "SKILL CONTENT={} keywords={} target={} implementation={}",
+                    skill.getName(),
+                    skill.getKeywords(),
+                    skill.getTarget(),
+                    skill.getImplementation().size()
+            );
 
             return skill;
 
@@ -199,7 +205,10 @@ public class SkillLoader {
         String content =
                 skill.getContent();
 
-
+        log.info(
+                "========== SKILL CONTENT ==========\n{}",
+                content
+        );
 
         String mode=null;
 
