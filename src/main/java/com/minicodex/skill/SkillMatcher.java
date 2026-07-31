@@ -32,7 +32,10 @@ public class SkillMatcher {
 
             cache =
                     loader.load();
-
+            log.info(
+                    "skill cache size={}",
+                    cache.size()
+            );
         }
 
 
@@ -55,12 +58,6 @@ public class SkillMatcher {
         for(Skill skill:cache){
 
 
-            log.info(
-                    "skill={} keywords={}",
-                    skill.getName(),
-                    skill.getKeywords()
-            );
-
 
             for(String keyword:
                     skill.getKeywords()){
@@ -69,7 +66,11 @@ public class SkillMatcher {
                 if(text.contains(
                         keyword.toLowerCase()
                 )){
-
+                    log.info(
+                            "match skill={} keyword={}",
+                            skill.getName(),
+                            keyword
+                    );
 
                     result.add(skill);
 

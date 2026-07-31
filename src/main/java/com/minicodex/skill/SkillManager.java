@@ -27,7 +27,7 @@ public class SkillManager {
                 matcher.match(task);
 
         log.info(
-                "loaded skills size={}",
+                "matched skills size={}",
                 skills.size()
         );
 

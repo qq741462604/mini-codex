@@ -341,7 +341,28 @@ oldText必须来自read_file真实内容。
 
 不要生成write_file。
 
+## Dynamic Field Rule
 
+对于字段加工类Skill:
+
+用户输入中的字段名称只是业务参数。
+
+禁止直接认为字段一定存在。
+
+必须:
+
+1. 根据Target定位目标类。
+
+2. 阅读handle方法。
+
+3. 根据上下文找到报文字段处理位置。
+
+4. 再根据用户需求增加字段加工逻辑。
+
+
+禁止:
+
+直接search_code搜索用户提供字段作为第一步。
 
 
 # Available Tools

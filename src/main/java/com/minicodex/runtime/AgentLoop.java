@@ -4,26 +4,20 @@ package com.minicodex.runtime;
 import com.minicodex.agent.AgentContext;
 import com.minicodex.agent.AgentPhase;
 import com.minicodex.agent.AgentStatus;
-import com.minicodex.agent.observation.Observation;
 import com.minicodex.agent.phase.PhaseManager;
 import com.minicodex.planner.CodePlan;
-import com.minicodex.planner.PlanStep;
 import com.minicodex.planner.Planner;
 import com.minicodex.project.ProjectIndex;
 import com.minicodex.project.ProjectIndexer;
-import com.minicodex.tool.ToolInput;
 import com.minicodex.verify.VerifyEngine;
 import com.minicodex.verify.VerifyResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-
 
 
 @Slf4j
@@ -50,17 +44,15 @@ public class AgentLoop {
     private final VerifyEngine verifyEngine;
 
 
-
     public void run(
             AgentContext context
-    ){
+    ) {
 
 
         log.info(
                 "===== AgentLoop START task={} =====",
                 context.getTask()
         );
-
 
 
         context.setStatus(
@@ -72,8 +64,7 @@ public class AgentLoop {
                 new HashSet<>();
 
 
-
-        for(int i=0;i<MAX_ITERATION;i++){
+        for (int i = 0; i < MAX_ITERATION; i++) {
 
 
             log.info(
@@ -83,10 +74,9 @@ public class AgentLoop {
             );
 
 
-
-            if(context.getPhase()
+            if (context.getPhase()
                     ==
-                    AgentPhase.FINISH){
+                    AgentPhase.FINISH) {
 
 
                 log.info(
@@ -105,9 +95,9 @@ public class AgentLoop {
              * VERIFY阶段单独处理
              *
              */
-            if(context.getPhase()
+            if (context.getPhase()
                     ==
-                    AgentPhase.VERIFY){
+                    AgentPhase.VERIFY) {
 
 
                 VerifyResult verifyResult =
@@ -116,7 +106,7 @@ public class AgentLoop {
                         );
 
 
-                if(verifyResult.isSuccess()){
+                if (verifyResult.isSuccess()) {
 
 
                     context.setPhase(
@@ -132,7 +122,7 @@ public class AgentLoop {
                     return;
 
 
-                }else{
+                } else {
 
 
                     context.setPhase(
@@ -163,32 +153,22 @@ public class AgentLoop {
             }
 
 
-
-
             CodePlan plan = planner.createPlan(context);
 
 
-
-
-
-
-
-
-
-
-            if(plan==null
+            if (plan == null
                     ||
-                    plan.getSteps()==null
+                    plan.getSteps() == null
                     ||
-                    plan.getSteps().isEmpty()){
+                    plan.getSteps().isEmpty()) {
 
                 log.warn(
                         "empty plan phase={}",
                         context.getPhase()
                 );
 
-                if(context.getPhase()
-                        == AgentPhase.CODING){
+                if (context.getPhase()
+                        == AgentPhase.CODING) {
 
                     log.error(
                             "CODING phase but planner returned empty plan, stop"
@@ -201,8 +181,6 @@ public class AgentLoop {
                     return;
 
                 }
-
-
 
 
                 AgentPhase next =
@@ -222,15 +200,11 @@ public class AgentLoop {
             }
 
 
-
-
-
             String planKey =
                     plan.toString();
 
 
-
-            if(executedPlans.contains(planKey)){
+            if (executedPlans.contains(planKey)) {
 
 
                 log.warn(
@@ -244,19 +218,15 @@ public class AgentLoop {
             }
 
 
-
             executedPlans.add(
                     planKey
             );
-
 
 
             log.info(
                     "execute plan={}",
                     plan
             );
-
-
 
 
             List<ToolCallResult> results =
@@ -266,14 +236,10 @@ public class AgentLoop {
                     );
 
 
-
             log.info(
                     "tool results={}",
                     results
             );
-
-
-
 
 
             ProjectIndex index =
@@ -282,11 +248,9 @@ public class AgentLoop {
                     );
 
 
-
             context.setProjectIndex(
                     index
             );
-
 
 
             log.info(
@@ -308,13 +272,11 @@ public class AgentLoop {
                     context.getPhase();
 
 
-
             AgentPhase next =
                     phaseManager.next(
                             current,
                             context
                     );
-
 
 
             log.info(
@@ -324,16 +286,12 @@ public class AgentLoop {
             );
 
 
-
             context.setPhase(
                     next
             );
 
 
-
-
         }
-
 
 
         log.warn(
@@ -342,9 +300,6 @@ public class AgentLoop {
 
 
     }
-
-
-
 
 
 }
