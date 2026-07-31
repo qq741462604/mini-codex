@@ -26,20 +26,17 @@ handle
 Rules:
 
 1. 所有日期加工逻辑必须在DataPrepEventHandler中完成。
-
 2. 根据用户需求识别:
    - 输入字段
    - 输入格式
    - 输出字段
    - 输出格式
-
 3. 支持:
    - 单字段日期转换
    - 多字段日期拼接转换
-
 4. 不创建新的Service、Controller、DTO。
-
 5. 不改变已有报文结构。
+6. 使用 eventData.putDataAndOriginData()方法写入数据
 
 Implementation:
 
