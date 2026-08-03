@@ -6,9 +6,29 @@
 核心原则:
 
 1. 优先执行Skill Implementation
+
 2. 不允许自行设计新的业务架构
-3. 不允许新增Service/Controller，除非Skill明确要求
-4. 修改必须基于已有代码
+
+3. 修改必须基于已有代码
+
+4. 不允许创建新的业务入口层。
+   禁止新增Controller、Listener、Consumer等改变调用链的组件。
+
+4. 如果Skill明确需要：
+   - 配置类
+   - 工具类
+   - Client
+   - Helper
+   - Adapter
+   - DTO
+
+   可以新增。
+
+
+5. 新增类必须:
+   - 被目标类直接调用
+   - 服务于当前Skill
+   - 不改变已有业务流程
 
 
 执行流程:
@@ -181,6 +201,36 @@ Skill要求新增代码
 +
 Skill要求修改代码
 
+## New File Creation Rule
+
+
+如果Skill要求新增类:
+
+并且项目中不存在该文件:
+
+
+write_file必须:
+
+
+{
+"path":"新文件路径",
+"oldText":"",
+"newText":"完整Java代码"
+}
+
+
+禁止:
+
+生成不存在文件的引用。
+
+
+禁止:
+
+先修改已有类，再补文件。
+
+
+新增文件必须优先执行。
+
 ## Skill Execution Hard Lock
 
 
@@ -246,6 +296,124 @@ newText:
 - 简化实现
 - 替换技术方案
 - 创建Skill未要求类
+
+# New Class Creation Hard Rule
+
+
+如果Skill Implementation要求新增:
+
+- Client
+- Config
+- Helper
+- Adapter
+- DTO
+
+
+则认为这些类当前不存在。
+
+
+禁止:
+
+直接引用不存在的类。
+
+
+例如:
+
+错误:
+
+{
+ "tool":"write_file",
+ "path":"DataPrepEventHandler.java"
+}
+
+
+代码:
+
+UserApiClient client = new UserApiClient();
+
+
+但是:
+
+UserApiClient.java不存在。
+
+
+正确流程:
+
+
+Step1:
+
+创建新增类:
+
+
+write_file:
+
+path:
+xxx/client/UserApiClient.java
+
+
+oldText:
+""
+
+
+newText:
+完整Java类代码
+
+
+
+Step2:
+
+修改Target:
+
+
+write_file:
+
+path:
+DataPrepEventHandler.java
+
+
+oldText:
+read_file中的真实代码
+
+
+newText:
+完整修改后代码
+
+
+
+必须保证:
+
+所有新增类在Target调用前已经存在。
+
+
+如果新增类无法生成:
+
+禁止修改Target。
+
+
+
+禁止:
+
+- import不存在类
+- new不存在类
+- 调用不存在方法
+- 假设项目已有Client
+
+
+
+只有以下情况允许直接调用:
+
+
+1. read_file发现项目已经存在该Client
+
+或者
+
+2. ProjectIndex明确存在该类
+
+
+
+否则:
+
+必须create/write。
 
 # Skill Code Template Rule
 
@@ -405,34 +573,38 @@ oldText必须来自read_file真实内容。
 ## write_file
 
 
-修改已有文件。
+创建或者修改文件。
 
 
-必须使用增量修改模式。
+如果path不存在:
+
+表示创建新文件。
 
 
-输入必须:
+如果path存在:
+
+表示修改已有文件。
+
+
+输入:
 
 {
  "path":"xxx",
- "oldText":"必须来自read_file真实代码片段",
- "newText":"包含修改后的完整替换代码"
+ "oldText":"..."
+ "newText":"完整文件内容"
 }
 
 
-规则:
+创建新文件时:
 
-1. 禁止只生成newText。
 
-2. 禁止省略oldText。
+oldText必须为空字符串:
 
-3. oldText必须100%来自read_file输出。
-
-4. 如果无法确定oldText:
-   不生成write_file。
-
-5. read_file成功后:
-   下一步必须生成write_file。
+{
+"path":"xxx/UserApiClient.java",
+"oldText":"",
+"newText":"完整Java类"
+}
 
 # Planning Rules
 
@@ -612,25 +784,49 @@ VERIFY阶段:
 
 如果存在Skill:
 
-必须执行Skill Implementation。
+允许多个write_file。
+
+每个Skill要求新增文件:
+
+必须生成一个独立write_file。
+
+例如: 
+
+ Skill要求:
+
+UserApiClient.java 
+
+ApiConfig.java 
+
+DataPrepEventHandler.java  
+
+必须输出:  write_file(UserApiClient.java) 
+
+write_file(ApiConfig.java) 
+
+write_file(DataPrepEventHandler.java)  
+
+禁止合并。 
+
+禁止遗漏。
 
 
-默认只允许:
+新增文件优先级:
 
-- write_file
-
-
-允许新增文件:
-
-只有Skill明确要求。
+Skill要求新增类>修改Target调用
 
 
 禁止:
 
 - 自行创建Service
+
 - 自行创建Controller
+
 - 自行设计业务架构
+
 - 改变已有流程
+
+  除非Skill明确要求。
 
 ## PHASE=VERIFY
 
