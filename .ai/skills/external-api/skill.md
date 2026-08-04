@@ -1,5 +1,3 @@
-
-
 # External API Client Skill
 
 
@@ -8,6 +6,9 @@ Keywords:
 接口
 外调
 HTTP
+REST
+RestTemplate
+调用接口
 
 
 Target:
@@ -16,269 +17,92 @@ class: DataPrepEventHandler
 
 method: handle
 
-Rules:
 
-Target Modification Lock
-
-
-修改Target类:
-
-必须:
-
-1. read_file获取完整文件
-
-2. 保留:
-
-- package
-- import
-- class
-- extends
-- implements
-- init
-- handle签名
+# Rules
 
 
-只允许:
+## 1. Target Protection Rule
 
-在:
 
-Map<String,Object> eventFields =
-eventData.getData();
+修改Target类之前:
 
-之后增加:
+必须执行:
 
-字段获取
-Client调用
-eventData.putDataAndOriginData
+read_file读取Target完整文件。
 
 
 禁止:
 
-- 重写handle
-- 删除已有逻辑
-- 移动已有代码
-- 修改try-catch
-- 修改日志
+- 创建新的Target类
+- 复制Target模板
+- 重写Target文件
+- 替换package
+- 替换import
+- 替换class定义
+- 替换extends
+- 替换implements
+- 修改init方法
+- 修改handle方法签名
 
 
-
-修改Target类时:
-
-必须:
-
-1. read_file获取完整文件。
-
-2. 保留:
-
-- package
-
-- import
-
-- class定义
-
-- extends关系
-
-- implements关系
-
-- init方法
-
-- handle方法签名
-
-  
-
-Target修改规则:
+Target只能使用patch方式修改。
 
 
-Target文件:
-
-必须使用:
+Target修改必须使用:
 
 oldText + newText
 
 
-禁止:
+oldText规则:
 
-create模式修改Target。
-
-
-只有以下文件允许create:
-
-- Client
-- Config
-- DTO
-- RestTemplateConfig
-
-Target Rewrite Forbidden:
+- 必须来自read_file返回内容
+- 必须包含真实源码
+- 禁止为空
 
 
-如果目标文件已经存在:
+newText规则:
 
-write_file只能使用:
-
-oldText + newText
-
-
-newText只能包含:
+只能:
 
 原oldText代码
+
 +
-新增调用代码
+
+新增业务调用代码
 
 
 禁止:
 
-newText包含完整DataPrepEventHandler类。
+- newText包含完整Target类
+- newText重新生成package
+- newText重新生成import
+- newText重新生成class
 
 
+---
 
-Architecture:
+## 2. Target Modification Scope
 
-application.yml
 
-↓
+Target.handle只能增加:
 
-UserApiConfig
 
-↓
+1. 获取业务字段
 
-UserApiClient
 
-↓
+2. 调用Client
 
-DataPrepEventHandler.handle
 
-Client Return Rule:
+3. eventData.putDataAndOriginData()
 
-Client禁止直接返回业务字段值。
 
-例如:
+允许位置:
 
-禁止:
 
-String queryUserName(String userId)
+必须找到:
 
 
-必须:
-
-返回接口响应DTO。
-
-例如:
-
-UserResponseDTO
-
-由Target决定:
-
-哪个字段写入eventData。
-
-
-
-RestTemplate Detection Rule:
-
-进入CODING之前:
-
-必须在ANALYSIS阶段:
-
-search_code:
-
-RestTemplate
-@Configuration
-@Bean
-
-
-如果发现:
-
-RestTemplate Bean:
-
-禁止创建RestTemplateConfig。
-
-
-如果没有:
-
-才允许create RestTemplateConfig。
-
-
-
-ApiConfig Rule:
-
-配置类必须:
-
-@Component
-@ConfigurationProperties(prefix="external.xxx")
-
-
-禁止:
-
-@Configuration
-public class XxxApiConfig
-
-Config Naming Rule:
-
-
-必须:
-
-业务名称 + ApiConfig
-
-
-例如:
-
-UserApiConfig
-
-
-禁止:
-
-ApiConfig
-
-Config
-
-
-
-1. 外调代码必须封装Client。
-
-2. handle只能负责:
-- 获取字段
-- 调用Client
-- putDataAndOriginData
-
-
-3. 允许新增:
-- Config
-- Client
-- DTO
-- RestTemplateConfig
-
-Implementation:
-
-执行顺序:
-
-
-Step1:
-
-必须先读取Target类完整代码。
-
-
-Step2:
-
-创建接口配置。
-
-
-Step3:
-
-创建Client。
-
-
-Step4:
-
-修改Target.handle。
-
-禁止跳过已有代码读取。
-
-
-
-
-必须:
-
-找到:
-
+```java
 EventData eventData =
 (EventData)context.getUserData()
 .get(ContextKeyConstant.EVENT_DATA);
@@ -286,99 +110,345 @@ EventData eventData =
 
 Map<String,Object> eventFields =
 eventData.getData();
+```
 
+只能在:
 
-在该位置之后增加调用。
+eventData.getData()
 
-
-禁止:
-
-替换handle方法。
-
-Target Write Rule:
-
-
-Target修改不是创建文件。
-
-
-Target write_file:
-
-path必须来自read_file返回路径。
-
-
-input必须:
-
-oldText:
-来自read_file原文
-
-
-newText:
-基于oldText增加代码
-
+之后增加代码。
 
 禁止:
 
-oldText为空字符串
+- 移动已有代码
+- 删除已有代码
+- 修改try-catch结构
+- 修改日志
+- 修改return流程
+
+------
+
+## 3. Existing Code Protection
+
+修改Target必须保留:
+
+- package
+- import
+- class
+- extends
+- implements
+- init方法
+- handle方法签名
+- 已有字段
+- 已有日志
+- 已有异常处理
 
 禁止:
 
-newText包含完整class
+- 删除字段
+- 删除逻辑
+- 修改父类
+- 修改方法参数
+- 修改方法返回类型
 
+------
 
-Config Rule:
+# Architecture
 
-接口配置必须来自application.yml。
+必须生成:
+
+```
+application.yml
+
+        |
+        v
+
+UserApiConfig
+
+        |
+        v
+
+UserApiClient
+
+        |
+        v
+
+DataPrepEventHandler.handle
+```
+
+调用链必须保持:
+
+```
+配置
+ ↓
+ApiConfig
+ ↓
+ApiClient
+ ↓
+Target
+```
 
 禁止:
 
-- Client写死URL
-- Client写死timeout
-- static final保存配置
+```
+Target
+ ↓
+HTTP
+```
 
-需要两个不同配置时:
+------
 
-接口参数配置:
+# Implementation
 
-xxxApiConfig.java
+必须严格执行:
 
+## Step1
 
-Spring Bean配置:
-
-xxxHttpConfig.java
-
-
-两者禁止混淆。
-
-
-xxxApiConfig:
-
-必须@ConfigurationProperties
-
-
-xxxHttpConfig:
-
-只能创建Bean。
-
+read_file Target
 
 禁止:
 
-用xxxApiConfig创建RestTemplate Bean。
+未读取Target直接修改。
 
+------
 
-Client Rule:
+## Step2
 
-优先:
+分析项目HTTP能力。
 
+必须search_code:
+
+```
 RestTemplate
 
-如果Client使用RestTemplate:
+@Configuration
 
+@Bean
 
-代码结构必须严格如下:
+RestTemplateBuilder
+```
 
+检查:
+
+是否已经存在RestTemplate Bean。
+
+------
+
+## Step3
+
+创建application.yml配置。
+
+如果存在application.yml:
+
+必须修改已有文件。
+
+禁止:
+
+创建Java配置替代。
+
+格式:
+
+```
+external:
+  user-api:
+    url: xxx
+    timeout: 3000
+    method: GET
+```
+
+------
+
+## Step4
+
+创建ApiConfig。
+
+命名规则:
+
+必须:
+
+业务名称 + ApiConfig
+
+例如:
+
+```
+UserApiConfig
+```
+
+禁止:
+
+```
+ApiConfig
+Config
+HttpConfig
+ExternalApiConfig
+```
+
+------
+
+## Step5
+
+创建Client。
+
+必须:
+
+Client独立文件。
+
+------
+
+## Step6
+
+如果不存在RestTemplate Bean:
+
+创建:
+
+```
+RestTemplateConfig
+```
+
+否则禁止创建。
+
+------
+
+## Step7
+
+patch修改Target.handle。
+
+必须使用:
+
+oldText + newText
+
+------
+
+# Config Rule
+
+## ApiConfig职责
+
+ApiConfig只负责业务接口配置。
+
+必须:
+
+```
+@Component
+@ConfigurationProperties(prefix="external.user-api")
+public class UserApiConfig {
+
+    private String url;
+
+    private Integer timeout;
+
+    private String method;
+
+}
+```
+
+必须包含:
+
+- url
+- timeout
+- method
+
+禁止:
+
+- @Bean
+- RestTemplate
+- RestTemplateBuilder
+- HTTP客户端创建
+
+禁止:
+
+```
+@Configuration
+public class UserApiConfig
+```
+
+------
+
+# Http Config Rule
+
+Spring基础设施配置:
+
+只能:
+
+```
+RestTemplateConfig
+```
+
+例如:
+
+```
+@Configuration
+public class RestTemplateConfig {
+
+    @Bean
+    public RestTemplate restTemplate(){
+        return new RestTemplate();
+    }
+
+}
+```
+
+禁止:
+
+```
+UserApiConfig
+ExternalApiConfig
+UserHttpConfig
+```
+
+创建RestTemplate Bean。
+
+------
+
+# Application Config Rule
+
+接口配置必须来自:
+
+application.yml
+
+禁止:
+
+- Java保存URL
+- Java保存timeout
+- static final保存配置
+- Client保存接口地址
+
+禁止:
+
+```
+private static final String URL
+```
+
+禁止:
+
+```
+private static final int TIMEOUT
+```
+
+------
+
+# Client Rule
+
+HTTP客户端优先级:
+
+1. RestTemplate
+2. WebClient
+3. 项目已有HTTP封装
+4. HttpURLConnection
+
+禁止默认生成:
+
+HttpURLConnection
+
+------
+
+如果使用RestTemplate:
+
+Client必须结构:
+
+```
 @Component
 @RequiredArgsConstructor
-public class XxxClient {
+public class XxxApiClient {
 
 
     private final RestTemplate restTemplate;
@@ -388,150 +458,201 @@ public class XxxClient {
 
 
 }
-
-
-禁止出现:
-
-RestTemplate restTemplate =
-
-new RestTemplate();
-
+```
 
 禁止:
 
-方法内部创建RestTemplate;
-
-
-禁止:
-
-static RestTemplate;
-
-检查RestTemplate Bean:
-
-必须搜索:
-
-RestTemplate
-
-@Configuration
-
-@Bean
-
-RestTemplateBuilder
-
-
-只有全部确认不存在:
-
-才允许创建RestTemplateConfig
-
-
-
-
-禁止在CODING阶段临时搜索。
-
-只有确认不存在后:
-
-才允许创建RestTemplateConfig。
-
-
-禁止默认创建。
-
-
-Handle Rule:
-
-禁止HTTP代码进入handle。
-
-handle只能:
-
-1. 获取请求参数
-2. 调Client
-3. eventData.putDataAndOriginData
-
-Output:
-
-
-新增文件:
-
-必须输出完整文件。
-
-
-已有Target:
-
-禁止输出完整重写文件。
-
-Target只能输出增量修改:
-oldText + newText
+```
+new RestTemplate()
+```
 
 禁止:
 
-只引用不存在的Client。
-
-Dynamic API Field Rule:
-
-
-用户任务中的字段:
-
-只是接口映射参数。
-
-
-必须根据User Task生成。
-
+方法内部创建RestTemplate。
 
 禁止:
 
-固定使用:
+```
+static RestTemplate
+```
 
-userId
-customerName
-name
+------
 
+# Client Config Binding Rule
 
-禁止:
+Client必须依赖:
 
-创建固定业务方法:
-
-queryUserName()
-
-
-Client方法应该根据接口能力命名。
-
-New File Dependency Rule:
-
-
-如果Target修改需要引用新增类:
-
-
-必须先创建对应文件。
-
+```
+private final XxxApiConfig config;
+```
 
 例如:
 
-Target引用:
+```
+private final UserApiConfig config;
+```
 
+禁止:
+
+```
+@Value("${xxx.url}")
+```
+
+禁止:
+
+```
+@Value("${xxx.timeout}")
+```
+
+禁止:
+
+默认URL。
+
+禁止:
+
+Client出现:
+
+```
+http://
+https://
+```
+
+------
+
+# DTO Rule
+
+接口返回JSON:
+
+必须优先创建DTO。
+
+例如:
+
+```
+UserResponseDTO
+```
+
+Client返回:
+
+DTO
+
+禁止:
+
+```
+String queryUserName()
+```
+
+禁止:
+
+Client解析业务字段。
+
+禁止:
+
+```
+Map<String,Object>
+```
+
+解析业务响应。
+
+------
+
+# Client Responsibility
+
+Client负责:
+
+1. 参数组装
+2. HTTP请求
+3. DTO解析
+
+Target负责:
+
+1. 获取字段
+2. 调Client
+3. putDataAndOriginData
+
+禁止:
+
+Client直接修改:
+
+```
+eventData
+```
+
+------
+
+# Dynamic Field Rule
+
+用户任务字段:
+
+只是动态映射。
+
+禁止固定:
+
+```
+userId
+customerName
+name
+```
+
+禁止生成固定方法:
+
+```
+queryUserName()
+```
+
+方法名称必须体现接口能力。
+
+例如:
+
+```
+queryUserInfo()
+
+getUserDetail()
+
+fetchUser()
+```
+
+------
+
+# Dependency Rule
+
+如果Target需要:
+
+```
 UserApiClient
+```
 
+必须先创建:
 
-必须存在:
-
+```
 UserApiClient.java
-
+```
 
 禁止:
 
 先修改Target
 
-后创建依赖类。
+后创建Client。
 
-Write Order Lock:
+------
 
+# Multi File Write Order
 
-如果同一个任务存在:
+如果任务需要:
 
-create Client
-create Config
-modify Target
+```
+Config
+Client
+Target
+```
 
+必须:
 
-必须严格:
+```
+write_file(Config)
+
+完成
+
+↓
 
 write_file(Client)
 
@@ -539,166 +660,159 @@ write_file(Client)
 
 ↓
 
-write_file(Config)
-
-完成
-
-↓
-
-write_file(Target)
-
+write_file(Target patch)
+```
 
 禁止:
 
-Target write_file 出现在 Client/Config 前。
+Target先写入。
 
-Multi File Rule:
+------
 
+# Target Write Rule
 
-如果Implementation要求新增多个文件:
+Target write_file:
 
-必须生成多个write_file。
+path:
 
+必须来自read_file。
 
-顺序:
+input必须:
 
-1. Config
-2. Client
-3. Target修改
-
-Application Config Rule:
-
-
-如果项目存在application.yml:
-
-必须修改application.yml。
-
+```
+oldText
+newText
+```
 
 禁止:
 
-创建:
-
-ApiConfig.java
-
-保存url
-
+```
+create Target
+```
 
 禁止:
 
-创建:
+```
+oldText=""
+```
 
-public class ApiConfig {
- static String url;
-}
+------
 
+# Skill Completion Check
 
-application.yml示例:
+结束任务前必须确认:
 
-external:
-  user-api:
-    url: xxx
-    timeout: 3000
-    method: GET
+```
+[ ] Target read_file成功
 
-Skill Completion Check:
+[ ] application.yml存在接口配置
 
+[ ] ApiConfig存在
 
-只有满足以下全部条件:
+[ ] Client存在
 
-1. Config存在
-2. Client存在
-3. DTO存在(如果需要)
-4. Target.handle已经调用Client
-5. Target已经调用putDataAndOriginData
+[ ] DTO存在(如果需要)
 
+[ ] RestTemplate检查完成
 
-才允许结束任务。
+[ ] Target只patch修改
 
+[ ] Target调用Client
 
-如果Client存在但是Target未调用:
+[ ] Target使用putDataAndOriginData
 
-继续生成Target修改。
+[ ] 没有HTTP代码进入Target
+```
 
-Target Dependency Rule:
+任何一项失败:
 
+禁止结束任务。
 
-如果Target类不是Spring Bean:
+------
 
-禁止使用@Autowired注入。
-
-
-必须使用项目已有方式获取Client。
-
-
-如果无法确认:
-
-不得修改类定义增加@Component。
-
-Client Responsibility:
-
-
-Client负责:
-
-1. 请求发送
-2. 参数组装
-3. 返回解析
-
-
-Target禁止:
-
-解析HTTP返回JSON。
-
-Final Execution Check:
-
-
-生成Plan前必须检查:
-
-[ ] Target是否read_file成功
-[ ] 是否存在新增Client
-[ ] 是否存在新增Config
-[ ] Target是否只修改handle内部
-[ ] 是否保留原package/import/class
-[ ] 是否没有new RestTemplate
-[ ] 是否没有硬编码URL
-[ ] 是否没有创建Controller
-
-
-如果任意一项失败:
-
-禁止生成write_file。
-
-Forbidden:
-
-- 重写整个Target类
-- 创建新的Target类模板
-- Target引用未创建类。
-- 修改父类
-- 修改方法签名
-- 删除已有字段
-- 删除已有逻辑
-
-Before Generate Plan:
-
-必须检查:
-
-Target read_file:
-YES
-
-Target path:
-EXISTING
-
-If write_file target:
-
-必须:
-
-oldText != ""
-
-否则:
-
-禁止生成该step。
+# Generated Code Verify
 
 如果发现:
 
-create Target
+```
+@Value("${
+```
 
-立即停止。
+失败。
+
+如果发现:
+
+```
+@Bean
+```
+
+并且类名包含:
+
+```
+ApiConfig
+```
+
+失败。
+
+如果发现Client包含:
+
+```
+http://
+https://
+```
+
+失败。
+
+如果发现:
+
+```
+new RestTemplate()
+```
+
+失败。
+
+如果发现:
+
+```
+HttpURLConnection
+```
+
+默认生成:
+
+失败。
+
+如果Client没有:
+
+```
+private final XxxApiConfig config;
+```
+
+失败。
+
+------
+
+# Forbidden
+
+- rewrite Target
+- create Target
+- replace Target
+- copy Target template
+- modify Target signature
+- modify Target parent class
+- delete Target fields
+- delete Target logic
+- move Target code
+- HTTP code in handle
+- URL hardcode
+- timeout hardcode
+- new RestTemplate()
+- HttpURLConnection default generation
+- JSON parsing in Target
+- Response parsing in Target
+- Client直接put eventData
+- static接口配置
+- ApiConfig创建RestTemplate
+- Target引用不存在类
+- Target write before Client
+- Target write before Config
+- create Controller

@@ -17,7 +17,7 @@ llm:
     key: ${LLM_API_KEY}
 
   model: qwen3.7-plus
-#  model: qwen3-vl-235b-a22b-thinking
+#  model: qwen-plus-2025-07-28
 
 spring:
   profiles:
