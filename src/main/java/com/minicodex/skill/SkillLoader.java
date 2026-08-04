@@ -178,13 +178,13 @@ public class SkillLoader {
                     skill
             );
             log.info(
-                    "SKILL CONTENT={} keywords={} target={} implementation={}",
+                    "skill parsed name={} keywords={} target={} rules={} implementation={}",
                     skill.getName(),
                     skill.getKeywords(),
                     skill.getTarget(),
-                    skill.getImplementation().size()
+                    skill.getRules(),
+                    skill.getImplementation()
             );
-
             return skill;
 
 
@@ -218,8 +218,10 @@ public class SkillLoader {
                 content.split("\n")){
 
 
-            line=line.trim();
+//            line=line.trim();
+            String rawLine=line;
 
+            line=line.trim();
 
 
             if(line.isEmpty()){
@@ -311,9 +313,10 @@ public class SkillLoader {
             if("implementation".equals(mode)){
 
                 skill.getImplementation()
-                        .add(line);
+                        .add(rawLine);
 
             }
+
             if("target".equals(mode)){
 
 

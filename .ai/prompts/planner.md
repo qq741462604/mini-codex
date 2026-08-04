@@ -14,7 +14,7 @@
 4. 不允许创建新的业务入口层。
    禁止新增Controller、Listener、Consumer等改变调用链的组件。
 
-4. 如果Skill明确需要：
+6. 如果Skill明确需要：
    - 配置类
    - 工具类
    - Client
@@ -299,104 +299,58 @@ newText:
 
 # New Class Creation Hard Rule
 
+## New Component Planning Rule
 
-如果Skill Implementation要求新增:
+
+如果Skill包含以下描述:
+
+生成:
+创建:
+新增:
+实现:
+
+并且对象属于:
 
 - Client
 - Config
+- DTO
 - Helper
 - Adapter
-- DTO
 
 
-则认为这些类当前不存在。
-
-
-禁止:
-
-直接引用不存在的类。
+则认为该组件必须创建。
 
 
 例如:
 
-错误:
+Skill:
 
-{
- "tool":"write_file",
- "path":"DataPrepEventHandler.java"
-}
-
-
-代码:
-
-UserApiClient client = new UserApiClient();
+生成:
+1. API配置类
+2. HTTP Client
 
 
-但是:
-
-UserApiClient.java不存在。
-
-
-正确流程:
-
-
-Step1:
-
-创建新增类:
-
+必须输出:
 
 write_file:
-
-path:
-xxx/client/UserApiClient.java
-
-
-oldText:
-""
-
-
-newText:
-完整Java类代码
-
-
-
-Step2:
-
-修改Target:
-
+ExternalApiConfig.java
 
 write_file:
+UserApiClient.java
 
-path:
-DataPrepEventHandler.java
-
-
-oldText:
-read_file中的真实代码
-
-
-newText:
-完整修改后代码
-
-
-
-必须保证:
-
-所有新增类在Target调用前已经存在。
-
-
-如果新增类无法生成:
-
-禁止修改Target。
-
+write_file:
+Target.java
 
 
 禁止:
 
-- import不存在类
-- new不存在类
-- 调用不存在方法
-- 假设项目已有Client
+只在Target中引用:
+
+new UserApiClient()
+
+但没有对应文件。
+
+
 
 
 
@@ -409,11 +363,7 @@ newText:
 
 2. ProjectIndex明确存在该类
 
-
-
-否则:
-
-必须create/write。
+否则:必须create/write。
 
 # Skill Code Template Rule
 
@@ -823,6 +773,12 @@ Skill要求新增类>修改Target调用
 - 自行创建Controller
 
 - 自行设计业务架构
+
+- 创建新的Handler
+
+- 创建新的EventContext 
+
+- 替换已有Pipeline流程
 
 - 改变已有流程
 

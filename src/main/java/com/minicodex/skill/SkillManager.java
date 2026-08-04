@@ -90,6 +90,11 @@ public class SkillManager {
 
             sb.append("\n请严格执行以下Implementation:\n");
 
+            log.info(
+                    "skill={} implementation size={}",
+                    skill.getName(),
+                    skill.getImplementation().size()
+            );
 
             for(String item:
                     skill.getImplementation()){

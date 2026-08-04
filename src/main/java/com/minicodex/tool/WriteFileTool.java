@@ -134,21 +134,17 @@ public class WriteFileTool
 
         }else{
 
+            if(toolInput.getNewText()!=null){
 
-            content = toolInput.getContent();
+                content =
+                        toolInput.getNewText();
 
+            }else{
 
-            if(content==null
-                    &&
-                    toolInput.getNewText()!=null){
-
-
-                throw new RuntimeException(
-                        "oldText missing but newText exists"
-                );
+                content =
+                        toolInput.getContent();
 
             }
-
 
             if(content==null){
 
