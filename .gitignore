@@ -40,5 +40,6 @@ build/
 application-local.yml
 /.idea/
 
+/bak/
 *.json
 /src/main/java/com/minicodex/template/

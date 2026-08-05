@@ -9,9 +9,7 @@ import org.springframework.stereotype.Component;
 
 
 import java.io.*;
-import java.util.ArrayList;
-import java.util.List;
-
+import java.util.*;
 
 
 @Component
@@ -22,7 +20,14 @@ public class SkillLoader {
 
     private final AgentHomeService agentHomeService;
 
-
+    private static final Set<String> SECTIONS =
+            new HashSet<>(Arrays.asList(
+                    "keywords",
+                    "target",
+                    "rules",
+                    "implementation",
+                    "forbidden"
+            ));
 
     public List<Skill> load(){
 
@@ -178,11 +183,8 @@ public class SkillLoader {
                     skill
             );
             log.info(
-                    "skill parsed name={} keywords={} target={} rules={} implementation={}",
-                    skill.getName(),
-                    skill.getKeywords(),
-                    skill.getTarget(),
-                    skill.getRules(),
+                    "parsed implementation size={} content={}",
+                    skill.getImplementation().size(),
                     skill.getImplementation()
             );
             return skill;
@@ -255,8 +257,10 @@ public class SkillLoader {
 
             }
 
-            if(line.toLowerCase()
-                    .startsWith("implementation")){
+            String lower = line.toLowerCase();
+
+
+            if(lower.startsWith("implementation")){
                 mode="implementation";
                 continue;
             }
@@ -276,7 +280,17 @@ public class SkillLoader {
                 continue;
 
             }
+            line=line.trim();
 
+
+            if(line.isEmpty()){
+                continue;
+            }
+
+
+            if(line.startsWith("=")){
+                continue;
+            }
 
 
             if("keywords".equals(mode)){
@@ -312,63 +326,44 @@ public class SkillLoader {
 
             if("implementation".equals(mode)){
 
+
                 skill.getImplementation()
                         .add(rawLine);
+
+
+                continue;
 
             }
 
             if("target".equals(mode)){
 
 
-                if(line.startsWith("class")){
+                if(line.startsWith("class:")
+                        || line.startsWith("class=")){
 
-
-                    String value =
-                            line.substring(
-                                            line.indexOf(":")+1
-                                    )
-                                    .trim();
-
+                    String value = extractValue(line);
 
                     if(skill.getTarget()==null){
-
-                        skill.setTarget(
-                                new SkillTarget()
-                        );
-
+                        skill.setTarget(new SkillTarget());
                     }
-
 
                     skill.getTarget()
                             .setClassName(value);
-
 
                 }
 
 
 
-                if(line.startsWith("method")){
+                if(line.startsWith("method:") || line.startsWith("method=")){
 
-
-                    String value =
-                            line.substring(
-                                            line.indexOf(":")+1
-                                    )
-                                    .trim();
-
+                    String value = extractValue(line);
 
                     if(skill.getTarget()==null){
-
-                        skill.setTarget(
-                                new SkillTarget()
-                        );
-
+                        skill.setTarget(new SkillTarget());
                     }
-
 
                     skill.getTarget()
                             .setMethodName(value);
-
 
                 }
 
@@ -377,7 +372,28 @@ public class SkillLoader {
 
 
     }
+    private String extractValue(String line){
 
+        int index = line.indexOf(":");
+
+        if(index < 0){
+
+            index = line.indexOf("=");
+
+        }
+
+
+        if(index < 0){
+
+            return "";
+
+        }
+
+
+        return line.substring(index + 1)
+                .trim();
+
+    }
 
     private String cleanLine(
             String line

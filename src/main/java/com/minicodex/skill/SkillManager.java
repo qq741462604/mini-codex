@@ -88,7 +88,6 @@ public class SkillManager {
             }
 
 
-            sb.append("\n请严格执行以下Implementation:\n");
 
             log.info(
                     "skill={} implementation size={}",
@@ -96,14 +95,21 @@ public class SkillManager {
                     skill.getImplementation().size()
             );
 
-            for(String item:
-                    skill.getImplementation()){
+            sb.append("\nImplementation:\n");
+
+            String implementation =
+                    String.join("\n",
+                            skill.getImplementation());
 
 
-                sb.append(item)
-                        .append("\n");
+            sb.append(
+                    limit(
+                            implementation,
+                            1500
+                    )
+            );
 
-            }
+            sb.append("\n");
             sb.append("\nForbidden:\n");
 
 
@@ -125,6 +131,18 @@ public class SkillManager {
         return sb.toString();
 
     }
+    private String limit(String text,int max){
 
+        if(text==null){
+            return "";
+        }
+
+        if(text.length()>max){
+            return text.substring(0,max)
+                    + "\n...[truncated]";
+        }
+
+        return text;
+    }
 
 }

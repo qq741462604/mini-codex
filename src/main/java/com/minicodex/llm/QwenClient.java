@@ -32,11 +32,11 @@ public class QwenClient
     private OkHttpClient client =
             new OkHttpClient.Builder()
                     .connectTimeout(
-                            30,
+                            60,
                             TimeUnit.SECONDS
                     )
                     .readTimeout(
-                            120,
+                            300,
                             TimeUnit.SECONDS
                     )
                     .writeTimeout(

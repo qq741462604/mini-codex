@@ -144,9 +144,36 @@ public class ToolExecutor {
 
             try{
 
+                String protectionError = validateSkillProtection(step, context);
 
-                long start =
-                        System.currentTimeMillis();
+                if (protectionError != null) {
+
+                    log.error("skill protection blocked tool={} error={}",
+                            step.getTool(),
+                            protectionError);
+
+                    ToolCallResult failed =
+                            ToolCallResult.failed(
+                                    step.getTool(),
+                                    protectionError
+                            );
+
+                    results.add(failed);
+
+                    context.getObservations().add(
+                            Observation.builder()
+                                    .tool(step.getTool())
+                                    .success(false)
+                                    .input(step.getInput())
+                                    .error(protectionError)
+                                    .build()
+                    );
+
+                    continue;
+                }
+
+
+                long start = System.currentTimeMillis();
 
 
 
@@ -219,13 +246,6 @@ public class ToolExecutor {
                                         .build()
                         );
 
-//                log.info(
-//                        "tool={} success={} result={}",
-//                        step.getTool(),
-//                        callResult.isSuccess(),
-//                        result
-//                );
-
 
 
 
@@ -287,6 +307,77 @@ public class ToolExecutor {
 
     }
 
+    private String validateSkillProtection(
+            PlanStep step,
+            AgentContext context
+    ) {
+
+
+        if (!(step.getInput() instanceof com.minicodex.tool.ToolInput)) {
+            return null;
+        }
+
+
+        com.minicodex.tool.ToolInput input =
+                (com.minicodex.tool.ToolInput) step.getInput();
+
+
+        String path = input.getPath();
+
+
+        if (path == null) {
+            return null;
+        }
+
+
+        String normalized =
+                path.replace("\\", "/");
+
+
+        /*
+         * Target保护
+         */
+        if ("write_file".equals(step.getTool())
+                &&
+                normalized.endsWith(
+                        "DataPrepEventHandler.java"
+                )) {
+
+
+            return "Skill Protection: "
+                    + "DataPrepEventHandler is existing Target, "
+                    + "must use patch_file instead of write_file";
+        }
+
+
+
+        /*
+         * patch_file必须read_file
+         */
+        if ("patch_file".equals(step.getTool())) {
+
+
+            boolean readSuccess =
+                    context.getObservations()
+                            .stream()
+                            .anyMatch(o ->
+                                    "read_file".equals(o.getTool())
+                                            &&
+                                            o.isSuccess()
+                            );
+
+
+            if (!readSuccess) {
+
+                return "Skill Protection: "
+                        + "patch_file requires read_file first";
+
+            }
+        }
+
+
+        return null;
+    }
 
     private boolean samePath(
             String a,
@@ -310,10 +401,12 @@ public class ToolExecutor {
             AgentContext context
     ){
 
-        if(!"create_file".equals(step.getTool())){
+
+        if (!"create_file".equals(step.getTool())
+                &&
+                !"write_file".equals(step.getTool())) {
 
             return false;
-
         }
 
 
