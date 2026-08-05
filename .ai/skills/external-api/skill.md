@@ -56,7 +56,55 @@ patch_file
 
 禁止生成Plan。
 
+Target Patch Absolute Rule:
 
+patch_file修改Target时:
+
+newText禁止重新生成整个文件。
+
+newText必须只包含:
+oldText中需要替换的小范围代码
++
+新增代码
+
+
+如果oldText包含:
+
+package
+import
+class
+extends
+
+则newText禁止包含这些内容。
+
+
+patch_file只允许修改:
+字段区域
+方法内部
+
+
+禁止:
+newText从package开始
+newText包含完整class
+newText包含完整文件
+
+
+错误示例:
+
+package xxx;
+
+public class Xxx {
+
+}
+
+正确示例:
+
+private XxxApiClient client;
+
+@Override
+public void handle(){
+
+}
 
 ==================================================
 
@@ -579,7 +627,104 @@ RestTemplate
 
 创建RestTemplate Bean。
 
+Package Rule:
 
+禁止:
+
+Config
+Client
+DTO
+
+创建到:
+
+Target所在package
+
+
+必须:
+
+根据项目已有目录结构选择package。
+
+
+创建前必须:
+
+search_code:
+@Configuration
+@Component
+@RestController
+@Service
+
+
+确定已有package。
+
+
+例如:
+
+config类:
+
+xxx.config
+
+client类:
+
+xxx.client
+
+dto类:
+
+xxx.dto
+
+
+禁止:
+
+所有新类都放入Target package。
+
+
+
+Target Dependency Rule:
+
+Target新增依赖必须使用:
+
+@RequiredArgsConstructor
+
+
+禁止:
+
+@Autowired
+
+
+禁止:
+
+字段注入。
+
+
+如果Target原本没有构造器:
+
+允许增加:
+
+private final XxxApiClient client;
+
+并增加@RequiredArgsConstructor。
+
+
+
+EventData Rule:
+
+Target写入结果:
+
+只能:
+
+eventData.putDataAndOriginData()
+
+
+禁止:
+
+eventData.put()
+
+禁止:
+
+eventData.set()
+
+禁止:
+
+直接修改内部map。
 
 ==================================================
 

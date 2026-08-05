@@ -114,7 +114,10 @@ public class ToolExecutor {
                 continue;
 
             }
-
+            log.info(
+                    "AVAILABLE TOOLS={}",
+                    toolRegistry.getTool(step.getTool())
+            );
 
             AgentTool tool =
                     toolRegistry.getTool(

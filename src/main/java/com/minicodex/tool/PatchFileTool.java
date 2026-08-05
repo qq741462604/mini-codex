@@ -2,6 +2,7 @@ package com.minicodex.tool;
 
 
 import com.minicodex.agent.AgentContext;
+import com.minicodex.agent.observation.Observation;
 import org.springframework.stereotype.Component;
 
 
@@ -34,7 +35,62 @@ public class PatchFileTool
     }
 
 
+    private void validatePatch(
+            ToolInput input,
+            AgentContext context
+    ){
 
+        if(input.getOldText()==null
+                ||
+                input.getOldText().trim().isEmpty()){
+
+            throw new RuntimeException(
+                    "patch_file requires oldText"
+            );
+        }
+
+
+
+        boolean fromReadFile=false;
+
+
+        for(Observation o:
+                context.getObservations()){
+
+
+            if(!o.isSuccess()){
+                continue;
+            }
+
+
+            if(!"read_file".equals(o.getTool())){
+                continue;
+            }
+
+
+            if(o.getResult()!=null
+                    &&
+                    o.getResult().toString()
+                            .contains(input.getOldText())){
+
+
+                fromReadFile=true;
+                break;
+            }
+
+        }
+
+
+
+        if(!fromReadFile){
+
+            throw new RuntimeException(
+                    "patch_file oldText must come from read_file"
+            );
+
+        }
+
+    }
 
     @Override
     public Object execute(
@@ -48,6 +104,7 @@ public class PatchFileTool
                 (ToolInput) input;
 
 
+        validatePatch(toolInput,context);
 
         String path =
                 toolInput.getPath();

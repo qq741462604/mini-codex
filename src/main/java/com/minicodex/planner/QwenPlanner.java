@@ -65,6 +65,7 @@ public class QwenPlanner implements Planner {
 
         String prompt = templateService.render(template, vars);
 
+        log.info("planner prompt={}", prompt);
         log.info("planner prompt length={}", prompt.length());
         log.info("planner template length={}", template.length());
         log.info("PROJECT length={}", vars.get("PROJECT") == null ? 0 : vars.get("PROJECT").length());
@@ -73,6 +74,10 @@ public class QwenPlanner implements Planner {
         log.info("LAST_ACTION length={}", vars.get("LAST_ACTION") == null ? 0 : vars.get("LAST_ACTION").length());
 
         String response = llmClient.chat(prompt);
+        log.info(
+                "========== PLAN RESPONSE ==========\n{}",
+                response
+        );
 
         CodePlan plan = parse(context.getTask(), response);
 
@@ -108,8 +113,8 @@ public class QwenPlanner implements Planner {
                             (ToolInput)step.getInput();
 
 
-                    if(isTargetFile(input.getPath())){
-//                    if(input.getPath().contains("DataPrepEventHandler")){
+//                    if(isTargetFile(input.getPath())){
+                    if(input.getPath().contains("DataPrepEventHandler")){
 
 
                         log.warn(
@@ -133,14 +138,7 @@ public class QwenPlanner implements Planner {
 
     }
 
-    private boolean isTargetFile(String path){
 
-        return path!=null
-                &&
-                path.endsWith(
-                        "DataPrepEventHandler.java"
-                );
-    }
 
     private CodePlan parse(String task, String json) {
         try {

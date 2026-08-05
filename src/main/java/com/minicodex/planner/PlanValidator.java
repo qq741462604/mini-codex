@@ -12,15 +12,14 @@ public class PlanValidator {
     public void validate(CodePlan plan) {
 
 
-        if (plan == null
-                || plan.getSteps() == null) {
+        if(plan == null
+                || plan.getSteps()==null){
 
             return;
         }
 
 
-        for (PlanStep step : plan.getSteps()) {
-
+        for(PlanStep step: plan.getSteps()){
 
             validateTarget(step);
 
@@ -30,76 +29,99 @@ public class PlanValidator {
 
 
 
+
     private void validateTarget(
             PlanStep step
-    ) {
+    ){
 
 
-        if (!(step.getInput()
-                instanceof ToolInput)) {
+        if(!(step.getInput()
+                instanceof ToolInput)){
 
             return;
 
         }
+
 
 
         ToolInput input =
                 (ToolInput) step.getInput();
 
 
+
         String path =
                 input.getPath();
 
 
-        if (path == null) {
+
+        if(path==null){
 
             return;
 
         }
 
 
+
         String normalized =
-                path.replace("\\", "/");
+                path.replace("\\","/");
 
 
 
-        /*
-         * 已存在Target禁止write_file
-         */
-        if ("write_file".equals(step.getTool())
-                &&
-                normalized.endsWith(
-                        "DataPrepEventHandler.java"
-                )) {
+        if(!normalized.endsWith(
+                "DataPrepEventHandler.java"
+        )){
 
-
-            throw new RuntimeException(
-                    "Plan invalid: "
-                            + "DataPrepEventHandler is existing Target, "
-                            + "must use patch_file"
-            );
+            return;
 
         }
 
 
 
+        String tool =
+                step.getTool();
+
+
+
         /*
-         * 禁止Target创建
+         * Target允许:
+         *
+         * read_file
+         * patch_file
+         *
          */
-        if ("create_file".equals(step.getTool())
-                &&
-                normalized.endsWith(
-                        "DataPrepEventHandler.java"
-                )) {
 
 
-            throw new RuntimeException(
-                    "Plan invalid: "
-                            + "cannot create existing Target"
-            );
+        if("read_file".equals(tool)){
+
+            return;
 
         }
+
+
+
+        if("patch_file".equals(tool)){
+
+
+            return;
+
+        }
+
+
+
+
+        /*
+         * 其他全部禁止
+         *
+         */
+
+
+        throw new RuntimeException(
+                "Plan invalid: Target cannot use tool="
+                        + tool
+        );
+
 
     }
+
 
 }
