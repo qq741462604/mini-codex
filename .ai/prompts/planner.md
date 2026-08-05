@@ -52,14 +52,17 @@ Step4:
 
 
 
-# User Task
+# Available Skills
 
-{{TASK}}
-
+{{SKILLS}}
 
 # Project Context
 
 {{PROJECT}}
+
+# User Task
+
+{{TASK}}
 
 # Agent Memories
 
@@ -69,11 +72,13 @@ Step4:
 
 {{PROJECT_INDEX}}
 
-# Available Skills
+# PHASE 
 
-{{SKILLS}}
+{{PHASE_RULES}}
 
+# TARGET_RULE
 
+{{TARGET_RULE}}
 
 # Observations
 
@@ -682,10 +687,6 @@ VERIFY阶段:
 当前Agent阶段:
 
 {{PHASE}}
-
-# Phase Rules
-
-{{PHASE_RULES}}
 
 # Agent Phase Rules
 

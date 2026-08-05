@@ -49,6 +49,10 @@ public class QwenPlanner implements Planner {
 
         vars.put("SKILLS", matchedSkills);
         vars.put("TASK", context.getTask());
+        vars.put(
+                "TARGET_RULE",
+                buildTargetRule()
+        );
         vars.put("PHASE", context.getPhase().name());
         vars.put("PHASE_RULES", buildPhaseRules(context));
 
@@ -78,21 +82,59 @@ public class QwenPlanner implements Planner {
                 "========== PLAN RESPONSE ==========\n{}",
                 response
         );
-
+        log.info(
+                "========== PROMPT TAIL ==========\n{}",
+                prompt.substring(
+                        Math.max(0,prompt.length()-2000)
+                )
+        );
         CodePlan plan = parse(context.getTask(), response);
 
         try {
             planValidator.validate(plan);
         } catch (Exception e) {
             log.error("plan validation failed {}", e.getMessage());
-            plan = repairPlan(plan, e.getMessage());
+//            plan = repairPlan(plan, e.getMessage());
+//
+//            planValidator.validate(plan);
 
-            planValidator.validate(plan);
+            throw new RuntimeException(
+                    "Planner generated invalid plan: "
+                            + e.getMessage()
+            );
         }
 
         return plan;
     }
 
+    private String buildTargetRule() {
+        return "Target File Rule:\n" +
+                "\n" +
+                "如果任务涉及:\n" +
+                "DataPrepEventHandler.java\n" +
+                "\n" +
+                "该文件已经存在。\n" +
+                "\n" +
+                "禁止:\n" +
+                "write_file\n" +
+                "\n" +
+                "禁止:\n" +
+                "create_file\n" +
+                "\n" +
+                "必须:\n" +
+                "\n" +
+                "Step1:\n" +
+                "read_file\n" +
+                "\n" +
+                "Step2:\n" +
+                "patch_file\n" +
+                "\n" +
+                "patch_file必须基于read_file返回oldText。\n" +
+                "\n" +
+                "任何情况下不能重新生成整个Target。\n" +
+                "\n";
+    }
+    
     private CodePlan repairPlan(
             CodePlan plan,
             String error
@@ -176,7 +218,7 @@ public class QwenPlanner implements Planner {
                                 .build()
                 );
             }
-
+            normalizeTargetTool(steps);
             return CodePlan.builder()
                     .task(task)
                     .steps(steps)
@@ -185,6 +227,49 @@ public class QwenPlanner implements Planner {
         } catch (Exception e) {
             throw new RuntimeException("parse plan failed:" + json, e);
         }
+    }
+
+    private void normalizeTargetTool(List<PlanStep> steps){
+
+
+        for(PlanStep step:steps){
+
+
+            if(step.getInput() instanceof ToolInput){
+
+
+                ToolInput input =
+                        (ToolInput)step.getInput();
+
+
+                String path=input.getPath();
+
+
+                if(path==null){
+                    continue;
+                }
+
+
+                if(path.endsWith(
+                        "DataPrepEventHandler.java"
+                )
+                        &&
+                        "write_file".equals(step.getTool())){
+
+
+                    log.warn(
+                            "normalize target write_file -> patch_file"
+                    );
+
+
+                    step.setTool("patch_file");
+
+                }
+
+            }
+
+        }
+
     }
 
     private String buildLastAction(AgentContext context) {
