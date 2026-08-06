@@ -561,6 +561,47 @@ oldText必须为空字符串:
 "newText":"完整Java类"
 }
 
+# Tool Selection Rules
+
+生成每一个step前必须判断文件状态。
+
+规则:
+
+1. Target文件:
+如果文件存在:
+禁止:
+write_file
+create_file
+
+必须:
+patch_file
+
+
+2. 新文件:
+如果文件不存在:
+允许:
+write_file
+
+
+3. 不确定文件是否存在:
+必须先:
+search_code
+或
+read_file
+
+
+禁止:
+猜测文件不存在。
+
+
+4. DataPrepEventHandler.java属于Target:
+永远只能:
+patch_file
+
+
+禁止生成:
+write_file DataPrepEventHandler.java
+
 # Planning Rules
 
 
@@ -633,27 +674,65 @@ Repository搜索
 
 3. SUCCESS_PATTERN可以作为实现参考。
 
-
 # Output Format
 
 只能输出 JSON。
 
-格式：
+禁止输出 Markdown。
+禁止输出解释文字。
+
+
+生成 Plan 前必须遵守:
+
+1. 已存在文件禁止使用 write_file。
+
+2. 修改已有文件必须使用 patch_file。
+
+3. Target 文件:
+DataPrepEventHandler.java
+
+属于已有文件。
+
+修改 Target 必须:
+
+Step1:
+read_file
+
+Step2:
+patch_file
+
+
+4. patch_file要求:
+
+input必须包含:
+
+{
+"path":"文件路径",
+"oldText":"read_file返回的完整内容",
+"newText":"修改后的完整文件内容"
+}
+
+
+5. 禁止:
+
+write_file修改已有Java文件。
+
+6. 禁止:
+
+自己编造oldText。
+
+
+JSON格式:
 
 {
  "steps":[
    {
-    "tool":"search_code",
-    "input":{
-       "keyword":"xxx"
-    },
+    "tool":"xxx",
+    "input":{},
     "description":"xxx"
    }
  ]
 }
-
-禁止输出 Markdown。
-禁止输出解释文字。
 
 ## Phase Constraint
 
@@ -732,30 +811,13 @@ VERIFY阶段:
 
 根据用户任务和Skill修改已有代码。
 
+如果Skill指定Target:
 
-如果存在Skill:
+Target文件:
+必须patch_file
 
-允许多个write_file。
-
-每个Skill要求新增文件:
-
-必须生成一个独立write_file。
-
-例如: 
-
- Skill要求:
-
-UserApiClient.java 
-
-ApiConfig.java 
-
-DataPrepEventHandler.java  
-
-必须输出:  write_file(UserApiClient.java) 
-
-write_file(ApiConfig.java) 
-
-write_file(DataPrepEventHandler.java)  
+新增文件:
+允许write_file
 
 禁止合并。 
 

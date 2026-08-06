@@ -40,57 +40,74 @@ public class PatchFileTool
             AgentContext context
     ){
 
-        if(input.getOldText()==null
-                ||
-                input.getOldText().trim().isEmpty()){
+        if(!fromReadFile(input,context)){
 
             throw new RuntimeException(
-                    "patch_file requires oldText"
+                    "patch_file oldText must come from read_file"
             );
         }
 
+    }
 
 
-        boolean fromReadFile=false;
+    private boolean fromReadFile(
+            ToolInput input,
+            AgentContext context
+    ){
 
-
-        for(Observation o:
-                context.getObservations()){
-
+        for(Observation o: context.getObservations()){
 
             if(!o.isSuccess()){
                 continue;
             }
-
 
             if(!"read_file".equals(o.getTool())){
                 continue;
             }
 
 
-            if(o.getResult()!=null
-                    &&
-                    o.getResult().toString()
-                            .contains(input.getOldText())){
+            if(!(o.getResult() instanceof FileContent)){
+                continue;
+            }
 
 
-                fromReadFile=true;
-                break;
+            FileContent fc =
+                    (FileContent)o.getResult();
+
+
+            StringBuilder content =
+                    new StringBuilder();
+
+
+            for(String line: fc.getLines()){
+
+                int index=line.indexOf(": ");
+
+                if(index>=0){
+                    content.append(
+                            line.substring(index+2)
+                    );
+                }else{
+                    content.append(line);
+                }
+
+                content.append("\n");
+            }
+
+
+            if(content.toString()
+                    .contains(input.getOldText())){
+
+                return true;
             }
 
         }
 
 
-
-        if(!fromReadFile){
-
-            throw new RuntimeException(
-                    "patch_file oldText must come from read_file"
-            );
-
-        }
-
+        return false;
     }
+
+
 
     @Override
     public Object execute(

@@ -41,5 +41,8 @@ application-local.yml
 /.idea/
 
 /bak/
+logs/*
+!logs/.gitkeep
 *.json
 /src/main/java/com/minicodex/template/
+/logs/

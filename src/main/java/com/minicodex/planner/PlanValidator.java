@@ -28,6 +28,7 @@ public class PlanValidator {
     }
 
 
+
     private void validateTarget(
             PlanStep step
     ){
@@ -37,74 +38,6 @@ public class PlanValidator {
                 instanceof ToolInput)){
 
             return;
-        }
-
-
-        ToolInput input =
-                (ToolInput) step.getInput();
-
-
-        String path=input.getPath();
-
-
-        if(path==null){
-
-            return;
-        }
-
-
-        path=path.replace("\\","/");
-
-
-
-        if(!path.endsWith(
-                "DataPrepEventHandler.java"
-        )){
-            return;
-        }
-
-
-
-        /*
-         * Target只能patch
-         */
-        if(!"patch_file".equals(step.getTool())){
-
-
-            throw new RuntimeException(
-                    "Target only supports patch_file"
-            );
-
-        }
-
-
-
-        /*
-         * patch必须有oldText
-         */
-        if(input.getOldText()==null
-                || input.getOldText().length()<50){
-
-
-            throw new RuntimeException(
-                    "patch_file Target oldText invalid"
-            );
-
-        }
-
-
-    }
-
-    private void validateTarget1(
-            PlanStep step
-    ){
-
-
-        if(!(step.getInput()
-                instanceof ToolInput)){
-
-            return;
-
         }
 
 
@@ -132,6 +65,9 @@ public class PlanValidator {
 
 
 
+        /*
+         * Target文件规则
+         */
         if(!normalized.endsWith(
                 "DataPrepEventHandler.java"
         )){
@@ -148,14 +84,8 @@ public class PlanValidator {
 
 
         /*
-         * Target允许:
-         *
-         * read_file
-         * patch_file
-         *
+         * Target允许读取
          */
-
-
         if("read_file".equals(tool)){
 
             return;
@@ -164,7 +94,20 @@ public class PlanValidator {
 
 
 
+        /*
+         * Target允许patch
+         */
         if("patch_file".equals(tool)){
+
+
+            if(input.getOldText()==null
+                    || input.getOldText().length()<50){
+
+                throw new RuntimeException(
+                        "patch_file Target oldText invalid"
+                );
+
+            }
 
 
             return;
@@ -173,15 +116,11 @@ public class PlanValidator {
 
 
 
-
         /*
-         * 其他全部禁止
-         *
+         * Target禁止其他修改方式
          */
-
-
         throw new RuntimeException(
-                "Plan invalid: Target cannot use tool="
+                "Target cannot use tool="
                         + tool
         );
 

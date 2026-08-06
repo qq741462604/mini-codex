@@ -32,15 +32,16 @@ public class AgentPolicy {
         );
 
 
-
         RULES.put(
                 AgentPhase.CODING,
                 new HashSet<>(
                         Arrays.asList(
                                 "create_file",
                                 "write_file",
+                                "patch_file",
                                 "edit_file",
-                                "read_file"
+                                "read_file",
+                                "search_code"
                         )
                 )
         );
@@ -64,8 +65,10 @@ public class AgentPolicy {
                 new HashSet<>(
                         Arrays.asList(
                                 "read_file",
-                                "edit_file",
-                                "write_file"
+                                "search_code",
+                                "write_file",
+                                "patch_file",
+                                "edit_file"
                         )
                 )
         );

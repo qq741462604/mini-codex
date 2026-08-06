@@ -1,5 +1,10 @@
 package com.minicodex;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
+
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -9,7 +14,9 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class MiniCodexApplication {
 
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
+
+        resetLogFile();
 
 
         SpringApplication.run(
@@ -17,6 +24,11 @@ public class MiniCodexApplication {
                 args
         );
 
+    }
+
+    private static void resetLogFile() throws IOException {
+        Files.createDirectories(Paths.get("logs"));
+        Files.write(Paths.get("logs", "mini-codex.log"), new byte[0], StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
     }
 
 }

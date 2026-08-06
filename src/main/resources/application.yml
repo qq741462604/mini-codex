@@ -2,6 +2,8 @@ server:
   port: 8080
 
 logging:
+  file:
+    name: logs/mini-codex.log
   level:
     com.minicodex.trace: INFO
 

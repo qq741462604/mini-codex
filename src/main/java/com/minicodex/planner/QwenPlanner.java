@@ -89,22 +89,157 @@ public class QwenPlanner implements Planner {
                 )
         );
         CodePlan plan = parse(context.getTask(), response);
+        plan = repairInvalidPatchPlan(context, plan);
+        try {
+            log.info(
+                    "========== PARSED PLAN ==========\n{}",
+                    objectMapper.writeValueAsString(plan)
+            );
+        } catch(Exception e){
 
+        }
         try {
             planValidator.validate(plan);
         } catch (Exception e) {
             log.error("plan validation failed {}", e.getMessage());
+
+            throw new RuntimeException(
+                    "Planner generated invalid plan:"
+                            + e.getMessage()
+            );
+
 //            plan = repairPlan(plan, e.getMessage());
 //
 //            planValidator.validate(plan);
 
-            throw new RuntimeException(
-                    "Planner generated invalid plan: "
-                            + e.getMessage()
-            );
+//            context.getVerifyErrors()
+//                    .add(
+//                            "Plan invalid:"
+//                                    + e.getMessage()
+//                    );
+//
+//
+//            return CodePlan.builder()
+//                    .task(context.getTask())
+//                    .steps(new ArrayList<>())
+//                    .build();
+
         }
 
         return plan;
+    }
+
+    private CodePlan repairInvalidPatchPlan(
+            AgentContext context,
+            CodePlan plan
+    ) {
+
+        if (plan == null
+                || plan.getSteps() == null
+                || plan.getSteps().isEmpty()) {
+
+            return plan;
+
+        }
+
+        for (PlanStep step : plan.getSteps()) {
+
+            if (!"patch_file".equals(step.getTool())
+                    || !(step.getInput() instanceof ToolInput)) {
+
+                continue;
+
+            }
+
+            ToolInput input =
+                    (ToolInput) step.getInput();
+
+            if (!isTargetFile(input.getPath())) {
+
+                continue;
+
+            }
+
+            if (isInvalidPatchOldText(input.getOldText())) {
+
+                log.warn(
+                        "invalid target patch oldText detected, fallback to read_file path={}",
+                        input.getPath()
+                );
+
+                return CodePlan.builder()
+                        .task(context.getTask())
+                        .steps(singleReadStep(input.getPath()))
+                        .build();
+
+            }
+
+        }
+
+        return plan;
+
+    }
+
+    private List<PlanStep> singleReadStep(
+            String path
+    ) {
+
+        List<PlanStep> steps =
+                new ArrayList<>();
+
+        steps.add(
+                PlanStep.builder()
+                        .order(1)
+                        .tool("read_file")
+                        .input(
+                                ToolInput.builder()
+                                        .path(path)
+                                        .startLine(1)
+                                        .endLine(1000)
+                                        .build()
+                        )
+                        .description("Read target file before patch_file")
+                        .build()
+        );
+
+        return steps;
+
+    }
+
+    private boolean isTargetFile(
+            String path
+    ) {
+
+        if (path == null) {
+
+            return false;
+
+        }
+
+        return path.replace("\\", "/")
+                .endsWith("DataPrepEventHandler.java");
+
+    }
+
+    private boolean isInvalidPatchOldText(
+            String oldText
+    ) {
+
+        if (oldText == null
+                || oldText.trim().length() < 50) {
+
+            return true;
+
+        }
+
+        String normalized =
+                oldText.trim();
+
+        return normalized.contains("{{")
+                || normalized.contains("}}")
+                || normalized.contains("READ_FILE_CONTENT")
+                || normalized.contains("...");
+
     }
 
     private String buildTargetRule() {
@@ -305,18 +440,42 @@ public class QwenPlanner implements Planner {
                         "目标:分析项目，不修改代码";
 
             case CODING:
-                return "当前阶段 CODING\n\n" +
-                        "工具规则:\n\n" +
-                        "新增文件:\n" +
-                        "允许:\n" +
-                        "- write_file\n\n\n" +
-                        "修改已有文件:\n" +
-                        "必须:\n" +
-                        "- patch_file\n\n\n" +
-                        "禁止:\n" +
-                        "- write_file修改已有文件\n\n\n" +
-                        "如果Skill存在:\n" +
-                        "优先执行Skill中的文件修改规则。\n";
+                return
+                        "当前阶段 CODING\n\n" +
+                                "工具规则:\n\n" +
+
+                                "新增文件:\n" +
+                                "允许:\n" +
+                                "- write_file\n\n" +
+
+                                "修改已有文件:\n" +
+                                "必须:\n" +
+                                "- patch_file\n\n" +
+
+                                "patch_file前置要求:\n" +
+                                "必须先执行read_file获取oldText。\n" +
+                                "禁止编造oldText。\n\n" +
+
+                                "禁止:\n" +
+                                "- write_file修改已有文件\n" +
+                                "- patch_file没有read_file结果\n\n" +
+
+                                "执行顺序:\n" +
+                                "1. 如果修改已有文件，必须先read_file读取完整文件。\n" +
+                                "2. 创建新增文件使用write_file。\n" +
+                                "3. 修改已有文件必须在read_file之后使用patch_file。\n" +
+                                "4. write_file和patch_file没有固定先后，但是patch_file之前必须存在成功read_file结果。\n\n" +
+
+                                "重要:\n" +
+                                "如果任务同时包含新增文件和修改已有文件:\n" +
+                                "必须生成:\n" +
+                                "read_file(Target文件)\n" +
+                                "write_file(新增文件)\n" +
+                                "patch_file(Target文件)\n\n" +
+
+                                "禁止:\n" +
+                                "根据项目上下文猜测oldText。\n" +
+                                "禁止直接patch_file已有文件。\n";
 
             case VERIFY:
                 return "当前阶段 VERIFY\n" +
@@ -367,8 +526,12 @@ public class QwenPlanner implements Planner {
 
             if (o.getResult() != null) {
                 String result = String.valueOf(o.getResult());
-                if (result.length() > 500) {
-                    result = result.substring(0, 500);
+                int maxResultLength =
+                        "read_file".equals(o.getTool())
+                                ? 8000
+                                : 500;
+                if (result.length() > maxResultLength) {
+                    result = result.substring(0, maxResultLength);
                 }
                 sb.append("result=").append(result).append("\n");
             }
