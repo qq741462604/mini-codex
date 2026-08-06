@@ -46,3 +46,5 @@ logs/*
 *.json
 /src/main/java/com/minicodex/template/
 /logs/
+/docs/
+/.mvn/

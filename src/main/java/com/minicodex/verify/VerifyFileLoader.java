@@ -140,6 +140,8 @@ public class VerifyFileLoader {
                     !"write_file".equals(o.getTool())
                     &&
                     !"edit_file".equals(o.getTool())
+                    &&
+                    !"patch_file".equals(o.getTool())
             ){
 
                 continue;

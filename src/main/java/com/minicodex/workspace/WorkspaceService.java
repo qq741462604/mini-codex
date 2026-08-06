@@ -40,23 +40,95 @@ public class WorkspaceService {
     ){
 
 
-        File file =
-                new File(path);
+        if(path==null
+                ||
+                path.trim().isEmpty()){
 
-
-
-        if(file.isAbsolute()){
-
-            return file;
+            throw new IllegalArgumentException(
+                    "workspace path empty"
+            );
 
         }
 
 
+        try{
 
-        return new File(
-                getRoot(),
-                path
-        );
+            File root =
+                    getRoot()
+                            .getCanonicalFile();
+
+
+            File file =
+                    new File(path);
+
+
+            File target =
+                    file.isAbsolute()
+                            ?
+                            file.getCanonicalFile()
+                            :
+                            new File(
+                                    root,
+                                    path
+                            ).getCanonicalFile();
+
+
+            if(!isUnderRoot(
+                    root,
+                    target
+            )){
+
+                throw new IllegalArgumentException(
+                        "path outside workspace: "
+                                +
+                                target.getAbsolutePath()
+                );
+
+            }
+
+
+            return target;
+
+
+        }catch(IllegalArgumentException e){
+
+            throw e;
+
+        }catch(Exception e){
+
+            throw new RuntimeException(
+                    "resolve workspace path failed:"
+                            +
+                            path,
+                    e
+            );
+
+        }
+
+    }
+
+
+    private boolean isUnderRoot(
+            File root,
+            File target
+    ) throws Exception {
+
+
+        String rootPath =
+                root.getCanonicalPath();
+
+
+        String targetPath =
+                target.getCanonicalPath();
+
+
+        return targetPath.equals(rootPath)
+                ||
+                targetPath.startsWith(
+                        rootPath
+                                +
+                                File.separator
+                );
 
 
     }

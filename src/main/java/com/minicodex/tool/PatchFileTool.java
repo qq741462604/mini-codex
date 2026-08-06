@@ -3,18 +3,24 @@ package com.minicodex.tool;
 
 import com.minicodex.agent.AgentContext;
 import com.minicodex.agent.observation.Observation;
+import com.minicodex.workspace.WorkspaceService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 
+import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Paths;
 
 
 
 @Component
+@RequiredArgsConstructor
 public class PatchFileTool
         extends BaseTool {
+
+
+    private final WorkspaceService workspaceService;
 
 
 
@@ -40,20 +46,26 @@ public class PatchFileTool
             AgentContext context
     ){
 
-        if(!fromReadFile(input,context)){
+        if(!wasFileRead(input,context)){
 
             throw new RuntimeException(
-                    "patch_file oldText must come from read_file"
+                    "patch_file requires read_file first"
             );
         }
 
     }
 
 
-    private boolean fromReadFile(
+    private boolean wasFileRead(
             ToolInput input,
             AgentContext context
     ){
+
+        File patchFile =
+                workspaceService.resolve(
+                        input.getPath()
+                );
+
 
         for(Observation o: context.getObservations()){
 
@@ -75,28 +87,16 @@ public class PatchFileTool
                     (FileContent)o.getResult();
 
 
-            StringBuilder content =
-                    new StringBuilder();
-
-
-            for(String line: fc.getLines()){
-
-                int index=line.indexOf(": ");
-
-                if(index>=0){
-                    content.append(
-                            line.substring(index+2)
+            File readFile =
+                    workspaceService.resolve(
+                            fc.getPath()
                     );
-                }else{
-                    content.append(line);
-                }
-
-                content.append("\n");
-            }
 
 
-            if(content.toString()
-                    .contains(input.getOldText())){
+            if(sameFile(
+                    patchFile,
+                    readFile
+            )){
 
                 return true;
             }
@@ -127,20 +127,47 @@ public class PatchFileTool
                 toolInput.getPath();
 
 
+        File file =
+                workspaceService.resolve(path);
+
 
         String content =
                 new String(
                         Files.readAllBytes(
-                                Paths.get(path)
+                                file.toPath()
                         ),
                         StandardCharsets.UTF_8
                 );
 
 
 
-        if(!content.contains(
-                toolInput.getOldText()
-        )){
+        String lineSeparator =
+                detectLineSeparator(content);
+
+
+        String oldText =
+                normalizeLineSeparator(
+                        toolInput.getOldText(),
+                        lineSeparator
+                );
+
+
+        String newText =
+                normalizeLineSeparator(
+                        toolInput.getNewText(),
+                        lineSeparator
+                );
+
+
+        boolean oldTextFound =
+                oldText!=null
+                        &&
+                        content.contains(oldText);
+
+
+        if(!oldTextFound
+                &&
+                !isFullFileContent(newText)){
 
 
             throw new RuntimeException(
@@ -151,16 +178,27 @@ public class PatchFileTool
 
 
 
-        String result =
-                content.replace(
-                        toolInput.getOldText(),
-                        toolInput.getNewText()
-                );
+        String result;
+
+
+        if(oldTextFound){
+
+            result =
+                    content.replace(
+                            oldText,
+                            newText
+                    );
+
+        }else{
+
+            result = newText;
+
+        }
 
 
 
         Files.write(
-                Paths.get(path),
+                file.toPath(),
                 result.getBytes(
                         StandardCharsets.UTF_8
                 )
@@ -168,8 +206,88 @@ public class PatchFileTool
 
 
 
-        return "patch success";
+        return FileOperationResult.builder()
+                .action("update")
+                .path(
+                        workspaceService.relativePath(file)
+                )
+                .success(true)
+                .message("patch success")
+                .build();
 
+
+    }
+
+
+    private String detectLineSeparator(
+            String content
+    ){
+
+
+        if(content.contains("\r\n")){
+
+            return "\r\n";
+
+        }
+
+
+        return "\n";
+
+    }
+
+
+    private String normalizeLineSeparator(
+            String text,
+            String lineSeparator
+    ){
+
+
+        if(text==null){
+
+            return null;
+
+        }
+
+
+        return text
+                .replace("\r\n","\n")
+                .replace("\r","\n")
+                .replace("\n",lineSeparator);
+
+    }
+
+
+    private boolean sameFile(
+            File left,
+            File right
+    ){
+
+
+        try{
+
+            return left.getCanonicalFile()
+                    .equals(
+                            right.getCanonicalFile()
+                    );
+
+        }catch(Exception e){
+
+            return false;
+
+        }
+
+    }
+
+
+    private boolean isFullFileContent(
+            String text
+    ){
+
+
+        return text!=null
+                &&
+                text.trim()
+                        .startsWith("package ");
 
     }
 

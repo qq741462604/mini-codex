@@ -27,18 +27,30 @@ public class CodingPhaseHandler
             AgentContext context
     ){
 
+        boolean failedChange =
+                context.getLastObservations()
+                        .stream()
+                        .anyMatch(
+                                o ->
+                                        isFileChangeTool(o.getTool())
+                                                &&
+                                                !o.isSuccess()
+                        );
+
+
+        if(failedChange){
+
+            return AgentPhase.CODING;
+
+        }
+
+
         boolean changed =
                 context.getLastObservations()
                         .stream()
                         .anyMatch(
                                 o ->
-                                        (
-                                                "create_file".equals(o.getTool())
-                                                        ||
-                                                        "write_file".equals(o.getTool())
-                                                        ||
-                                                        "edit_file".equals(o.getTool())
-                                        )
+                                        isFileChangeTool(o.getTool())
                                                 &&
                                                 o.isSuccess()
                         );
@@ -55,6 +67,22 @@ public class CodingPhaseHandler
 
 
         return AgentPhase.CODING;
+
+    }
+
+
+    private boolean isFileChangeTool(
+            String tool
+    ){
+
+
+        return "create_file".equals(tool)
+                ||
+                "write_file".equals(tool)
+                ||
+                "edit_file".equals(tool)
+                ||
+                "patch_file".equals(tool);
 
     }
 

@@ -8,12 +8,10 @@ logging:
     com.minicodex.trace: INFO
 
 minicodex:
-#  E:\AIwork\mini-codex
-  home: E:/AIwork/mini-codex
+  home: D:/ideaProject/AI/code-auto/mini-codex
 codex:
   workspace:
-#    E:\wokspace\gittest
-    root: E:/wokspace/gittest
+    root: D:/ideaProject/test
 
 llm:
   api:

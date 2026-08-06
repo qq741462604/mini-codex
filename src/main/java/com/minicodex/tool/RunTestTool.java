@@ -3,13 +3,19 @@ package com.minicodex.tool;
 
 import com.minicodex.agent.AgentContext;
 import com.minicodex.util.StreamUtil;
+import com.minicodex.workspace.WorkspaceService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 
 
 @Component
+@RequiredArgsConstructor
 public class RunTestTool
         extends BaseTool {
+
+
+    private final WorkspaceService workspaceService;
 
 
 
@@ -42,10 +48,15 @@ public class RunTestTool
 
 
         Process p =
-                Runtime.getRuntime()
-                        .exec(
-                                "mvn test"
-                        );
+                new ProcessBuilder(
+                        "mvn",
+                        "test"
+                )
+                        .directory(
+                                workspaceService.getRoot()
+                        )
+                        .redirectErrorStream(true)
+                        .start();
 
 
         return StreamUtil.read(
