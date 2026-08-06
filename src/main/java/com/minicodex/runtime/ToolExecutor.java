@@ -7,13 +7,18 @@ import com.minicodex.agent.policy.AgentPolicy;
 import com.minicodex.planner.CodePlan;
 import com.minicodex.planner.PlanStep;
 import com.minicodex.tool.AgentTool;
+import com.minicodex.tool.FileContent;
 import com.minicodex.tool.FileOperationResult;
+import com.minicodex.tool.SearchMatch;
+import com.minicodex.tool.ToolInput;
 import com.minicodex.trace.TraceStep;
+import com.minicodex.workspace.WorkspaceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -29,6 +34,9 @@ public class ToolExecutor {
 
 
     private final AgentPolicy agentPolicy;
+
+
+    private final WorkspaceService workspaceService;
 
     public List<ToolCallResult> execute(
             CodePlan plan,
@@ -51,6 +59,11 @@ public class ToolExecutor {
                     "execute tool={} phase={}",
                     step.getTool(),
                     context.getPhase()
+            );
+
+            normalizeKnownTargetPath(
+                    step,
+                    context
             );
 
             /*
@@ -114,11 +127,6 @@ public class ToolExecutor {
                 continue;
 
             }
-            log.info(
-                    "AVAILABLE TOOLS={}",
-                    toolRegistry.getTool(step.getTool())
-            );
-
             AgentTool tool =
                     toolRegistry.getTool(
                             step.getTool()
@@ -256,10 +264,10 @@ public class ToolExecutor {
             }catch(Exception e){
 
 
-                log.error(
-                        "tool execute failed tool={}",
+                log.warn(
+                        "tool execute failed tool={} error={}",
                         step.getTool(),
-                        e
+                        e.getMessage()
                 );
 
 
@@ -310,19 +318,306 @@ public class ToolExecutor {
 
     }
 
+    private void normalizeKnownTargetPath(
+            PlanStep step,
+            AgentContext context
+    ){
+
+
+        if(!(step.getInput() instanceof ToolInput)){
+
+            return;
+
+        }
+
+
+        ToolInput input =
+                (ToolInput)step.getInput();
+
+
+        String path =
+                input.getPath();
+
+
+        if(!isTargetPath(path)){
+
+            return;
+
+        }
+
+
+        if(pathExists(path)){
+
+            return;
+
+        }
+
+
+        String knownPath =
+                findKnownTargetPath(context);
+
+
+        if(knownPath==null){
+
+            knownPath =
+                    findSourceRootTargetPath(path);
+
+        }
+
+
+        if(knownPath==null){
+
+            return;
+
+        }
+
+
+        if(!samePath(path,knownPath)){
+
+            log.info(
+                    "normalize target path from={} to={}",
+                    path,
+                    knownPath
+            );
+
+            input.setPath(knownPath);
+
+        }
+
+    }
+
+
+    private boolean isTargetPath(
+            String path
+    ){
+
+
+        if(path==null){
+
+            return false;
+
+        }
+
+
+        return path.replace("\\","/")
+                .endsWith("DataPrepEventHandler.java");
+
+    }
+
+
+    private boolean pathExists(
+            String path
+    ){
+
+
+        try{
+
+            File file =
+                    workspaceService.resolve(path);
+
+
+            return file.exists()
+                    &&
+                    file.isFile();
+
+        }catch(Exception e){
+
+            return false;
+
+        }
+
+    }
+
+
+    private String findKnownTargetPath(
+            AgentContext context
+    ){
+
+
+        if(context.getObservations()==null){
+
+            return null;
+
+        }
+
+
+        for(int i=context.getObservations().size()-1;i>=0;i--){
+
+            Observation observation =
+                    context.getObservations().get(i);
+
+
+            if(!observation.isSuccess()){
+
+                continue;
+
+            }
+
+
+            String path =
+                    extractTargetPath(observation.getResult());
+
+
+            if(path!=null
+                    &&
+                    pathExists(path)){
+
+                return toRelativePath(path);
+
+            }
+
+        }
+
+
+        return null;
+
+    }
+
+
+    private String extractTargetPath(
+            Object result
+    ){
+
+
+        if(result instanceof FileContent){
+
+            String path =
+                    ((FileContent)result).getPath();
+
+
+            return isTargetPath(path)
+                    ? path
+                    : null;
+
+        }
+
+
+        if(result instanceof List){
+
+            for(Object item:(List<?>)result){
+
+                if(!(item instanceof SearchMatch)){
+
+                    continue;
+
+                }
+
+
+                SearchMatch match =
+                        (SearchMatch)item;
+
+
+                String path =
+                        match.getPath()!=null
+                                ? match.getPath()
+                                : match.getRelativePath();
+
+
+                if(isTargetPath(path)){
+
+                    return path;
+
+                }
+
+            }
+
+        }
+
+
+        return null;
+
+    }
+
+
+    private String findSourceRootTargetPath(
+            String path
+    ){
+
+
+        String normalized =
+                normalizeWorkspaceRelativePath(path);
+
+
+        if(normalized.startsWith("src/main/java/")){
+
+            return null;
+
+        }
+
+
+        String sourcePath =
+                "src/main/java/"
+                        +
+                        normalized;
+
+
+        return pathExists(sourcePath)
+                ? sourcePath
+                : null;
+
+    }
+
+
+    private String normalizeWorkspaceRelativePath(
+            String path
+    ){
+
+
+        String normalized =
+                path.replace("\\","/");
+
+
+        try{
+
+            File file =
+                    workspaceService.resolve(path);
+
+
+            return workspaceService.relativePath(file)
+                    .replace("\\","/");
+
+        }catch(Exception e){
+
+            return normalized;
+
+        }
+
+    }
+
+
+    private String toRelativePath(
+            String path
+    ){
+
+
+        try{
+
+            return workspaceService.relativePath(
+                    workspaceService.resolve(path)
+            );
+
+        }catch(Exception e){
+
+            return path;
+
+        }
+
+    }
+
+
     private String validateSkillProtection(
             PlanStep step,
             AgentContext context
     ) {
 
 
-        if (!(step.getInput() instanceof com.minicodex.tool.ToolInput)) {
+        if (!(step.getInput() instanceof ToolInput)) {
             return null;
         }
 
 
-        com.minicodex.tool.ToolInput input =
-                (com.minicodex.tool.ToolInput) step.getInput();
+        ToolInput input =
+                (ToolInput) step.getInput();
 
 
         String path = input.getPath();
@@ -349,7 +644,22 @@ public class ToolExecutor {
 
             return "Skill Protection: "
                     + "DataPrepEventHandler is existing Target, "
-                    + "must use patch_file instead of write_file";
+                            + "must use patch_file instead of write_file";
+        }
+
+
+        if("write_file".equals(step.getTool())
+                &&
+                normalized.endsWith("RestTemplateConfig.java")
+                &&
+                hasWrittenAnotherRestTemplateConfig(
+                        normalized,
+                        context
+                )){
+
+
+            return "Skill Protection: duplicate RestTemplateConfig is not allowed";
+
         }
 
 
@@ -361,13 +671,10 @@ public class ToolExecutor {
 
 
             boolean readSuccess =
-                    context.getObservations()
-                            .stream()
-                            .anyMatch(o ->
-                                    "read_file".equals(o.getTool())
-                                            &&
-                                            o.isSuccess()
-                            );
+                    hasReadFile(
+                            path,
+                            context
+                    );
 
 
             if (!readSuccess) {
@@ -380,6 +687,127 @@ public class ToolExecutor {
 
 
         return null;
+    }
+
+
+    private boolean hasReadFile(
+            String path,
+            AgentContext context
+    ){
+
+
+        if(context.getObservations()==null){
+
+            return false;
+
+        }
+
+
+        File target =
+                workspaceService.resolve(path);
+
+
+        return context.getObservations()
+                .stream()
+                .anyMatch(o -> {
+
+                    if(!"read_file".equals(o.getTool())
+                            ||
+                            !o.isSuccess()
+                            ||
+                            !(o.getResult() instanceof FileContent)){
+
+                        return false;
+
+                    }
+
+
+                    FileContent content =
+                            (FileContent)o.getResult();
+
+
+                    File readFile =
+                            workspaceService.resolve(
+                                    content.getPath()
+                            );
+
+
+                    return sameFile(
+                            target,
+                            readFile
+                    );
+
+                });
+
+    }
+
+
+    private boolean sameFile(
+            File left,
+            File right
+    ){
+
+
+        try{
+
+            return left.getCanonicalFile()
+                    .equals(
+                            right.getCanonicalFile()
+                    );
+
+        }catch(Exception e){
+
+            return false;
+
+        }
+
+    }
+
+
+    private boolean hasWrittenAnotherRestTemplateConfig(
+            String path,
+            AgentContext context
+    ){
+
+
+        return context.getObservations()
+                .stream()
+                .anyMatch(o -> {
+
+
+                    if(!o.isSuccess()
+                            ||
+                            !"write_file".equals(o.getTool())
+                            ||
+                            !(o.getInput() instanceof ToolInput)){
+
+                        return false;
+
+                    }
+
+
+                    String existingPath =
+                            ((ToolInput)o.getInput())
+                                    .getPath();
+
+
+                    if(existingPath==null){
+
+                        return false;
+
+                    }
+
+
+                    String normalizedExisting =
+                            existingPath.replace("\\","/");
+
+
+                    return normalizedExisting.endsWith("RestTemplateConfig.java")
+                            &&
+                            !normalizedExisting.equals(path);
+
+                });
+
     }
 
     private boolean samePath(

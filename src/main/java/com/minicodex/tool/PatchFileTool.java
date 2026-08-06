@@ -165,9 +165,7 @@ public class PatchFileTool
                         content.contains(oldText);
 
 
-        if(!oldTextFound
-                &&
-                !isFullFileContent(newText)){
+        if(!oldTextFound){
 
 
             throw new RuntimeException(
@@ -178,22 +176,11 @@ public class PatchFileTool
 
 
 
-        String result;
-
-
-        if(oldTextFound){
-
-            result =
-                    content.replace(
-                            oldText,
-                            newText
-                    );
-
-        }else{
-
-            result = newText;
-
-        }
+        String result =
+                content.replace(
+                        oldText,
+                        newText
+                );
 
 
 
@@ -275,19 +262,6 @@ public class PatchFileTool
             return false;
 
         }
-
-    }
-
-
-    private boolean isFullFileContent(
-            String text
-    ){
-
-
-        return text!=null
-                &&
-                text.trim()
-                        .startsWith("package ");
 
     }
 

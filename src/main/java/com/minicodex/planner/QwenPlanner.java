@@ -1,6 +1,5 @@
 package com.minicodex.planner;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.minicodex.agent.AgentContext;
@@ -45,7 +44,6 @@ public class QwenPlanner implements Planner {
         String matchedSkills = skillManager.buildContext(context.getTask());
 
         log.info("skill context length={}", matchedSkills == null ? 0 : matchedSkills.length());
-        log.info("========== MATCHED SKILLS ==========\n{}", matchedSkills);
 
         vars.put("SKILLS", matchedSkills);
         vars.put("TASK", context.getTask());
@@ -69,7 +67,6 @@ public class QwenPlanner implements Planner {
 
         String prompt = templateService.render(template, vars);
 
-        log.info("planner prompt={}", prompt);
         log.info("planner prompt length={}", prompt.length());
         log.info("planner template length={}", template.length());
         log.info("PROJECT length={}", vars.get("PROJECT") == null ? 0 : vars.get("PROJECT").length());
@@ -79,25 +76,15 @@ public class QwenPlanner implements Planner {
 
         String response = llmClient.chat(prompt);
         log.info(
-                "========== PLAN RESPONSE ==========\n{}",
-                response
-        );
-        log.info(
-                "========== PROMPT TAIL ==========\n{}",
-                prompt.substring(
-                        Math.max(0,prompt.length()-2000)
-                )
+                "plan response length={}",
+                response == null ? 0 : response.length()
         );
         CodePlan plan = parse(context.getTask(), response);
         plan = repairInvalidPatchPlan(context, plan);
-        try {
-            log.info(
-                    "========== PARSED PLAN ==========\n{}",
-                    objectMapper.writeValueAsString(plan)
-            );
-        } catch(Exception e){
-
-        }
+        log.info(
+                "parsed plan summary={}",
+                summarizePlan(plan)
+        );
         try {
             planValidator.validate(plan);
         } catch (Exception e) {
@@ -177,6 +164,58 @@ public class QwenPlanner implements Planner {
         }
 
         return plan;
+
+    }
+
+
+    private String summarizePlan(
+            CodePlan plan
+    ){
+
+
+        if(plan==null
+                ||
+                plan.getSteps()==null
+                ||
+                plan.getSteps().isEmpty()){
+
+            return "empty";
+
+        }
+
+
+        StringBuilder sb =
+                new StringBuilder();
+
+
+        for(PlanStep step:plan.getSteps()){
+
+            if(sb.length()>0){
+
+                sb.append("; ");
+
+            }
+
+
+            sb.append(step.getTool());
+
+
+            if(step.getInput() instanceof ToolInput){
+
+                ToolInput input =
+                        (ToolInput)step.getInput();
+
+
+                sb.append("(")
+                        .append(input.getPath())
+                        .append(")");
+
+            }
+
+        }
+
+
+        return sb.toString();
 
     }
 
@@ -261,8 +300,12 @@ public class QwenPlanner implements Planner {
                 "Step1:\n" +
                 "read_file\n" +
                 "\n" +
+                "read_file path必须使用search_code返回的真实path，禁止根据package自行拼接。\n" +
+                "\n" +
                 "Step2:\n" +
                 "patch_file\n" +
+                "\n" +
+                "patch_file path必须使用read_file返回的真实path。\n" +
                 "\n" +
                 "patch_file必须基于read_file返回oldText。\n" +
                 "\n" +
@@ -319,7 +362,19 @@ public class QwenPlanner implements Planner {
 
     private CodePlan parse(String task, String json) {
         try {
+            if(json==null
+                    ||
+                    json.trim().isEmpty()){
+
+                throw new RuntimeException(
+                        "model response is empty"
+                );
+
+            }
+
+
             JsonNode root = objectMapper.readTree(extractJson(json));
+            validateModelResponse(root);
             List<PlanStep> steps = new ArrayList<>();
             int index = 1;
             JsonNode stepArray;
@@ -359,9 +414,41 @@ public class QwenPlanner implements Planner {
                     .steps(steps)
                     .build();
 
+        } catch (RuntimeException e) {
+            throw e;
         } catch (Exception e) {
             throw new RuntimeException("parse plan failed:" + json, e);
         }
+    }
+
+    private void validateModelResponse(
+            JsonNode root
+    ){
+
+
+        if(!root.has("error")){
+
+            return;
+
+        }
+
+
+        JsonNode error =
+                root.get("error");
+
+
+        String message =
+                error.has("message")
+                        ? error.get("message").asText()
+                        : error.toString();
+
+
+        throw new RuntimeException(
+                "model call failed:"
+                        +
+                        message
+        );
+
     }
 
     private void normalizeTargetTool(List<PlanStep> steps){
@@ -488,8 +575,13 @@ public class QwenPlanner implements Planner {
                 return "当前阶段 REPAIR\n" +
                         "根据验证错误修复代码\n" +
                         "允许:\n" +
-                        "- edit_file\n" +
-                        "- write_file";
+                        "- read_file\n" +
+                        "- write_file\n" +
+                        "- patch_file\n\n" +
+                        "规则:\n" +
+                        "1. 修复已有文件必须先read_file再patch_file。\n" +
+                        "2. 只有创建新文件才能write_file。\n" +
+                        "3. 禁止write_file修改已有文件。";
 
             case FINISH:
                 return "任务已经完成，不生成任何tool";

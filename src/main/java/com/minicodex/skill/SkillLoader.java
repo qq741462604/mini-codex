@@ -183,9 +183,8 @@ public class SkillLoader {
                     skill
             );
             log.info(
-                    "parsed implementation size={} content={}",
-                    skill.getImplementation().size(),
-                    skill.getImplementation()
+                    "parsed implementation size={}",
+                    skill.getImplementation().size()
             );
             return skill;
 
@@ -208,8 +207,8 @@ public class SkillLoader {
                 skill.getContent();
 
         log.info(
-                "========== SKILL CONTENT ==========\n{}",
-                content
+                "skill content length={}",
+                content.length()
         );
 
         String mode=null;

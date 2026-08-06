@@ -152,9 +152,24 @@ public class QwenClient
 
             if(node.has("output")){
 
-                return node
-                        .get("output")
-                        .asText();
+                JsonNode output =
+                        node.get("output");
+
+
+                if(output.has("text")){
+
+                    return output
+                            .get("text")
+                            .asText();
+
+                }
+
+
+                if(output.isTextual()){
+
+                    return output.asText();
+
+                }
 
             }
 

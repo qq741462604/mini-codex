@@ -40,12 +40,16 @@ Step1:
 Step2:
 read_file读取完整代码
 
+必须使用 search_code 返回的目标文件 path 原值读取。
+
+禁止根据 package、class 名或目录习惯重新拼接 Target 路径。
+
 
 Step3:
 严格按照Skill Implementation修改
 
 Step4:
-使用write_file输出修改
+新文件使用write_file创建，已有文件使用patch_file修改
 
 如果Skill没有匹配:
 才进行普通分析。
@@ -138,6 +142,12 @@ search_code定位xxx
 Step 2:
 read_file读取xxx
 
+read_file 的 path 必须等于 search_code 返回的 path。
+
+后续 patch_file 的 path 必须等于 read_file 返回的 path。
+
+禁止把已发现的 Target 路径改写成其他包路径。
+
 
 禁止:
 
@@ -157,7 +167,10 @@ read_file读取xxx
 read_file完成后:
 
 
-下一步必须生成 write_file。
+下一步必须根据文件状态选择工具:
+
+- 新文件: write_file
+- 已有文件: patch_file
 
 
 禁止:
@@ -167,13 +180,13 @@ read_file完成后:
 - 自主设计方案
 - 修改其他类
 
-## Write File Generation Rule
+## Patch File Generation Rule
 
 
 当read_file成功后:
 
 
-下一步write_file必须满足:
+如果要修改该已读文件，下一步patch_file必须满足:
 
 
 input:
@@ -253,11 +266,10 @@ write_file必须:
 
 下一次Plan:
 
-只能生成:
+只能生成代码修改工具:
 
-{
- "tool":"write_file"
-}
+- 新文件: write_file
+- 已有文件: patch_file
 
 
 禁止生成:
@@ -267,12 +279,12 @@ write_file必须:
 - list_files
 
 
-直到write_file执行成功。
+直到代码修改工具执行成功。
 
 ## Code Rule
 
 
-write_file:
+代码修改工具:
 
 
 oldText:
@@ -343,7 +355,7 @@ ExternalApiConfig.java
 write_file:
 UserApiClient.java
 
-write_file:
+patch_file:
 Target.java
 
 
@@ -368,7 +380,7 @@ new UserApiClient()
 
 2. ProjectIndex明确存在该类
 
-否则:必须create/write。
+否则:新增文件必须write_file，已有文件必须patch_file。
 
 # Skill Code Template Rule
 
@@ -462,7 +474,7 @@ oldText必须来自read_file真实内容。
 
 如果无法匹配:
 
-不要生成write_file。
+不要生成代码修改Plan。
 
 ## Dynamic Field Rule
 
@@ -528,17 +540,12 @@ oldText必须来自read_file真实内容。
 ## write_file
 
 
-创建或者修改文件。
+只能创建新文件。
 
 
 如果path不存在:
 
 表示创建新文件。
-
-
-如果path存在:
-
-表示修改已有文件。
 
 
 输入:
@@ -559,6 +566,20 @@ oldText必须为空字符串:
 "path":"xxx/UserApiClient.java",
 "oldText":"",
 "newText":"完整Java类"
+}
+
+## patch_file
+
+只能修改已有文件。
+
+patch_file前必须先read_file读取同一路径完整内容。
+
+输入:
+
+{
+ "path":"xxx",
+ "oldText":"必须是最近一次read_file返回的完整内容",
+ "newText":"基于oldText修改后的完整文件内容"
 }
 
 # Tool Selection Rules
@@ -616,7 +637,7 @@ write_file DataPrepEventHandler.java
 
 2.read_file读取目标文件
 
-3.write_file修改
+3.新增文件write_file，已有文件patch_file
 
 
 禁止:
@@ -650,6 +671,7 @@ Repository搜索
 
 - read_file
 - write_file
+- patch_file
 
 
 禁止：
@@ -892,7 +914,7 @@ Skill要求新增类>修改Target调用
 
 - read_file
 - write_file
-- write_file
+- patch_file
 
 
 根据验证结果修改代码。
@@ -918,12 +940,12 @@ Skill要求新增类>修改Target调用
 
 # Execution History Rules
 
-1. 如果 OBSERVATIONS 中已经存在成功的 create_file/write_file/write_file:
+1. 如果 OBSERVATIONS 中已经存在成功的 create_file/write_file/patch_file:
    - 不允许再次创建同一个文件
 
 2. 如果文件已经创建:
    - 使用 read_file 查看
-   - 或 write_file 修改
+   - 或 patch_file 修改
 
 3. 如果任务目标已经完成:
    - 输出空 steps:

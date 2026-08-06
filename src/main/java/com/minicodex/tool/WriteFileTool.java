@@ -36,7 +36,7 @@ public class WriteFileTool
     @Override
     public String description(){
 
-        return "create or modify file";
+        return "create new file";
 
     }
 
@@ -58,6 +58,19 @@ public class WriteFileTool
                 workspaceService.resolve(
                         toolInput.getPath()
                 );
+
+
+        boolean existedBefore =
+                file.exists();
+
+
+        if(existedBefore){
+
+            throw new RuntimeException(
+                    "write_file cannot modify existing file, use patch_file"
+            );
+
+        }
 
 
 
@@ -111,8 +124,9 @@ public class WriteFileTool
             if(!source.contains(old)){
 
                 log.error(
-                        "oldText not found\noldText={}",
-                        toolInput.getOldText()
+                        "oldText not found path={} oldTextLength={}",
+                        toolInput.getPath(),
+                        toolInput.getOldText().length()
                 );
 
                 throw new RuntimeException(
@@ -170,7 +184,7 @@ public class WriteFileTool
         return FileOperationResult.builder()
 
                 .action(
-                        file.exists()
+                        existedBefore
                                 ?
                                 "update"
                                 :
