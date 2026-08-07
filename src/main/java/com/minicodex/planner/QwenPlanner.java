@@ -48,6 +48,8 @@ public class QwenPlanner implements Planner {
         vars.put("PROJECT", buildProjectSummary());
 
         String matchedSkills = skillManager.buildContext(context.getTask());
+        log.info("========== MATCHED SKILLS ==========\n{}", matchedSkills);
+
         vars.put("SKILLS", matchedSkills);
         vars.put("TASK", context.getTask());
         vars.put("TARGET_RULE", "");
@@ -63,14 +65,18 @@ public class QwenPlanner implements Planner {
         vars.put("PROJECT_INDEX", projectIndex);
 
         String prompt = templateService.render(template, vars);
+
         log.info(
-                "planner prompt length={} skillsLength={} observationsLength={}",
-                prompt.length(),
-                matchedSkills == null ? 0 : matchedSkills.length(),
-                observations.length()
+                "========== PROMPT TAIL ==========\n{}",
+                prompt.substring(
+                        Math.max(0,prompt.length()-2000)
+                )
         );
         String response = llmClient.chat(prompt);
-        log.info("planner response length={}", response == null ? 0 : response.length());
+        log.info(
+                "========== PLAN RESPONSE ==========\n{}",
+                response
+        );
         CodePlan plan = parse(context.getTask(), response);
         plan = repairExistingFileWritePlan(context, plan);
         plan = repairInvalidPatchPlan(context, plan);
