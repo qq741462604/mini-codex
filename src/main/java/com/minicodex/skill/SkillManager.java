@@ -1,148 +1,62 @@
 package com.minicodex.skill;
 
-
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-
 
 import java.util.List;
 
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class SkillManager {
 
-
     private final SkillMatcher matcher;
 
-
-
-    public String buildContext(
-            String task
-    ){
-
-
-        List<Skill> skills =
-                matcher.match(task);
-
-        log.info(
-                "matched skills size={}",
-                skills.size()
-        );
-
-        StringBuilder sb =
-                new StringBuilder();
-
-
-
-        for(Skill skill:skills){
-            log.info(
-                    "skill name={} keywords={}",
-                    skill.getName(),
-                    skill.getKeywords()
-            );
-
+    public String buildContext(String task) {
+        List<Skill> skills = matcher.match(task);
+        StringBuilder sb = new StringBuilder();
+        for (Skill skill : skills) {
             sb.append("\n## Skill:")
                     .append(skill.getName())
                     .append("\n");
 
-            if(skill.getTarget()!=null){
-
-
+            if (skill.getTarget() != null) {
                 sb.append("\nTarget:\n");
-
-
-                sb.append(
-                                "class="
-                        )
-                        .append(
-                                skill.getTarget()
-                                        .getClassName()
-                        )
+                sb.append("class=")
+                        .append(skill.getTarget().getClassName())
                         .append("\n");
-
-
-                sb.append(
-                                "method="
-                        )
-                        .append(
-                                skill.getTarget()
-                                        .getMethodName()
-                        )
+                sb.append("method=")
+                        .append(skill.getTarget().getMethodName())
                         .append("\n");
-
             }
 
             sb.append("Rules:\n");
-
-
-            for(String rule:
-                    skill.getRules()){
-
-
+            for (String rule : skill.getRules()) {
                 sb.append("- ")
                         .append(rule)
                         .append("\n");
-
             }
-
-
-
-            log.info(
-                    "skill={} implementation size={}",
-                    skill.getName(),
-                    skill.getImplementation().size()
-            );
 
             sb.append("\nImplementation:\n");
+            String implementation = String.join("\n", skill.getImplementation());
+            sb.append(limit(implementation, 1500));
 
-            String implementation =
-                    String.join("\n",
-                            skill.getImplementation());
-
-
-            sb.append(
-                    limit(
-                            implementation,
-                            1500
-                    )
-            );
-
-            sb.append("\n");
-            sb.append("\nForbidden:\n");
-
-
-            for(String f:
-                    skill.getForbidden()){
-
-
+            sb.append("\n\nForbidden:\n");
+            for (String forbidden : skill.getForbidden()) {
                 sb.append("- ")
-                        .append(f)
+                        .append(forbidden)
                         .append("\n");
-
             }
-
-
         }
-
-
-
         return sb.toString();
-
     }
-    private String limit(String text,int max){
 
-        if(text==null){
+    private String limit(String text, int max) {
+        if (text == null) {
             return "";
         }
-
-        if(text.length()>max){
-            return text.substring(0,max)
-                    + "\n...[truncated]";
+        if (text.length() > max) {
+            return text.substring(0, max) + "\n...[truncated]";
         }
-
         return text;
     }
-
 }

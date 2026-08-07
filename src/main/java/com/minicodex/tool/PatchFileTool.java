@@ -158,6 +158,38 @@ public class PatchFileTool
                         lineSeparator
                 );
 
+        if(newText==null){
+
+            throw new RuntimeException(
+                    "newText is null"
+            );
+
+        }
+
+        if(content.isEmpty()
+                &&
+                (oldText==null
+                        ||
+                        oldText.isEmpty())){
+
+            Files.write(
+                    file.toPath(),
+                    newText.getBytes(
+                            StandardCharsets.UTF_8
+                    )
+            );
+
+            return FileOperationResult.builder()
+                    .action("update")
+                    .path(
+                            workspaceService.relativePath(file)
+                    )
+                    .success(true)
+                    .message("patch success")
+                    .build();
+
+        }
+
 
         boolean oldTextFound =
                 oldText!=null

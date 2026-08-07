@@ -20,6 +20,7 @@ import java.util.concurrent.TimeUnit;
 public class QwenClient
         implements LlmClient {
 
+    private static final int READ_TIMEOUT_SECONDS = 300;
 
 
     private final ObjectMapper objectMapper;
@@ -36,7 +37,7 @@ public class QwenClient
                             TimeUnit.SECONDS
                     )
                     .readTimeout(
-                            300,
+                            READ_TIMEOUT_SECONDS,
                             TimeUnit.SECONDS
                     )
                     .writeTimeout(
@@ -71,6 +72,12 @@ public class QwenClient
 
 
         try{
+            long start = System.currentTimeMillis();
+            log.info(
+                    "qwen request model={} promptLength={}",
+                    model,
+                    prompt == null ? 0 : prompt.length()
+            );
 
 
             LlmRequest request =
@@ -129,6 +136,11 @@ public class QwenClient
                     response.body()
                             .string();
 
+            log.info(
+                    "qwen response cost={}ms bodyLength={}",
+                    System.currentTimeMillis() - start,
+                    body.length()
+            );
 
 
             JsonNode node =
@@ -196,7 +208,7 @@ public class QwenClient
                     "qwen call failed url={} model={} timeout={}ms",
                     url,
                     model,
-                    120000,
+                    READ_TIMEOUT_SECONDS * 1000,
                     e
             );
 

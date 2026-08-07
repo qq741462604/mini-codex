@@ -1,131 +1,93 @@
 package com.minicodex.planner;
 
-
 import com.minicodex.tool.ToolInput;
+import com.minicodex.workspace.WorkspaceService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.io.File;
 
 @Component
+@RequiredArgsConstructor
 public class PlanValidator {
 
+    private final WorkspaceService workspaceService;
 
     public void validate(CodePlan plan) {
-
-
-        if(plan == null
-                || plan.getSteps()==null){
-
+        if (plan == null || plan.getSteps() == null) {
             return;
         }
-
-
-        for(PlanStep step: plan.getSteps()){
-
-            validateTarget(step);
-
+        for (PlanStep step : plan.getSteps()) {
+            validateFileStep(step);
         }
-
     }
 
-
-
-    private void validateTarget(
-            PlanStep step
-    ){
-
-
-        if(!(step.getInput()
-                instanceof ToolInput)){
-
+    private void validateFileStep(PlanStep step) {
+        if (!(step.getInput() instanceof ToolInput)) {
             return;
         }
-
-
-
-        ToolInput input =
-                (ToolInput) step.getInput();
-
-
-
-        String path =
-                input.getPath();
-
-
-
-        if(path==null){
-
-            return;
-
+        ToolInput input = (ToolInput) step.getInput();
+        String path = input.getPath();
+        String tool = step.getTool();
+        if (isFileMutationTool(tool) && (path == null || path.trim().isEmpty())) {
+            throw new RuntimeException(tool + " path is empty");
         }
-
-
-
-        String normalized =
-                path.replace("\\","/");
-
-
-
-        /*
-         * Target文件规则
-         */
-        if(!normalized.endsWith(
-                "DataPrepEventHandler.java"
-        )){
-
+        if (isCreateTool(tool)) {
+            validateCreateTool(path, tool);
             return;
-
         }
-
-
-
-        String tool =
-                step.getTool();
-
-
-
-        /*
-         * Target允许读取
-         */
-        if("read_file".equals(tool)){
-
-            return;
-
+        if ("patch_file".equals(tool)) {
+            validatePatchTool(input);
         }
-
-
-
-        /*
-         * Target允许patch
-         */
-        if("patch_file".equals(tool)){
-
-
-            if(input.getOldText()==null
-                    || input.getOldText().length()<50){
-
-                throw new RuntimeException(
-                        "patch_file Target oldText invalid"
-                );
-
-            }
-
-
-            return;
-
-        }
-
-
-
-        /*
-         * Target禁止其他修改方式
-         */
-        throw new RuntimeException(
-                "Target cannot use tool="
-                        + tool
-        );
-
-
     }
 
+    private void validateCreateTool(String path, String tool) {
+        if (isExistingFile(path)) {
+            throw new RuntimeException(
+                    tool + " cannot modify existing file, use patch_file path=" + path
+            );
+        }
+    }
 
+    private void validatePatchTool(ToolInput input) {
+        String path = input.getPath();
+        if (!isExistingFile(path)) {
+            throw new RuntimeException("patch_file target file not found path=" + path);
+        }
+        if (input.getNewText() == null) {
+            throw new RuntimeException("patch_file newText is null path=" + path);
+        }
+        if (isEmptyFile(path)) {
+            return;
+        }
+        if (input.getOldText() == null || input.getOldText().trim().isEmpty()) {
+            throw new RuntimeException("patch_file oldText is empty path=" + path);
+        }
+    }
+
+    private boolean isCreateTool(String tool) {
+        return "write_file".equals(tool) || "create_file".equals(tool);
+    }
+
+    private boolean isFileMutationTool(String tool) {
+        return isCreateTool(tool) || "patch_file".equals(tool);
+    }
+
+    private boolean isExistingFile(String path) {
+        try {
+            File file = workspaceService.resolve(path);
+            return file.exists() && file.isFile();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private boolean isEmptyFile(String path) {
+        try {
+            File file = workspaceService.resolve(path);
+            return file.exists() && file.isFile() && file.length() == 0;
+        } catch (Exception e) {
+            return false;
+        }
+    }
 }

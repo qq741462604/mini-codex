@@ -170,18 +170,14 @@ public class CodeValidator {
             }
 
 
-            if(path.endsWith("DataPrepEventHandler.java")){
-
-                hasTarget = true;
-                targetBasePackage =
-                        deriveTargetBasePackage(
-                                extractPackage(content)
-                        );
-                targetCallsApiClient =
-                        content.contains("ApiClient")
-                                &&
-                                containsApiClientMethodCall(content);
-
+            if(isExternalApiTargetCandidate(path)){
+                if(targetBasePackage==null){
+                    targetBasePackage = deriveTargetBasePackage(extractPackage(content));
+                }
+                if(content.contains("ApiClient") && containsApiClientMethodCall(content)){
+                    hasTarget = true;
+                    targetCallsApiClient = true;
+                }
             }
 
 
@@ -275,7 +271,7 @@ public class CodeValidator {
                 !hasTarget){
 
             errors.add(
-                    "外部接口已生成ApiClient，但缺少DataPrepEventHandler最终代码校验"
+                    "外部接口已生成ApiClient，但缺少Target最终代码修改"
             );
 
         }
@@ -288,7 +284,7 @@ public class CodeValidator {
                 !targetCallsApiClient){
 
             errors.add(
-                    "外部接口已生成ApiClient，但DataPrepEventHandler缺少实际Client方法调用"
+                    "外部接口已生成ApiClient，但Target缺少实际Client方法调用"
             );
 
         }
@@ -308,6 +304,22 @@ public class CodeValidator {
                 path.endsWith("RestTemplateConfig.java")
                 ||
                 path.endsWith("ResponseDTO.java");
+
+    }
+
+
+    private boolean isExternalApiTargetCandidate(
+            String path
+    ){
+
+
+        String normalized =
+                path.replace("\\","/");
+
+
+        return normalized.endsWith(".java")
+                &&
+                !isExternalApiGeneratedFile(normalized);
 
     }
 
@@ -759,10 +771,7 @@ public class CodeValidator {
 
             return new FileSnapshot(
                     file.getPath(),
-                    String.join(
-                            "\n",
-                            file.getLines()
-                    )
+                    stripReadLineNumbers(file.getLines())
             );
 
         }
@@ -815,6 +824,44 @@ public class CodeValidator {
 
         return pattern.matcher(content)
                 .find();
+
+    }
+
+
+    private String stripReadLineNumbers(
+            List<String> lines
+    ){
+
+
+        if(lines==null
+                ||
+                lines.isEmpty()){
+
+            return "";
+
+        }
+
+
+        List<String> content =
+                new ArrayList<>();
+
+
+        for(String line: lines){
+
+            content.add(
+                    line.replaceFirst(
+                            "^\\d+: ?",
+                            ""
+                    )
+            );
+
+        }
+
+
+        return String.join(
+                "\n",
+                content
+        );
 
     }
 
@@ -1007,9 +1054,11 @@ public class CodeValidator {
         }
 
 
-        if(normalizedPath.endsWith("DataPrepEventHandler.java")){
+        if(isExternalApiTargetCandidate(normalizedPath)
+                &&
+                content.contains("ApiClient")){
 
-            validateDataPrepEventHandler(
+            validateExternalApiTarget(
                     path,
                     content,
                     errors
@@ -1357,7 +1406,7 @@ public class CodeValidator {
     }
 
 
-    private void validateDataPrepEventHandler(
+    private void validateExternalApiTarget(
             String path,
             String content,
             List<String> errors
@@ -1388,54 +1437,6 @@ public class CodeValidator {
                     path
                             +
                             " Target禁止新增@RequiredArgsConstructor改变生命周期"
-            );
-
-        }
-
-
-        if(!content.contains("extends RcesEventHandler")){
-
-            errors.add(
-                    path
-                            +
-                            " Target必须保留extends RcesEventHandler"
-            );
-
-        }
-
-
-        if(!content.contains("public void init(final AbstractPipeline pipeline)")){
-
-            errors.add(
-                    path
-                            +
-                            " Target必须保留原init方法"
-            );
-
-        }
-
-
-        if(!content.contains("public void handle(final PipelineContext context) throws EventHandlerException")){
-
-            errors.add(
-                    path
-                            +
-                            " Target必须保留原handle方法签名"
-            );
-
-        }
-
-
-        if(!content.contains("DataPrepEventHandler handle begin.")
-                ||
-                !content.contains("DataPrepEventHandler end.")
-                ||
-                !content.contains("DataPrepEventHandler preprocessing failed.")){
-
-            errors.add(
-                    path
-                            +
-                            " Target必须保留原有日志和异常处理结构"
             );
 
         }

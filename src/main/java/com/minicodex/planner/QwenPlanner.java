@@ -9,11 +9,16 @@ import com.minicodex.project.ProjectContextService;
 import com.minicodex.prompt.PromptLoader;
 import com.minicodex.prompt.PromptTemplateService;
 import com.minicodex.skill.SkillManager;
+import com.minicodex.tool.FileContent;
 import com.minicodex.tool.ToolInput;
+import com.minicodex.workspace.WorkspaceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.io.File;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -31,60 +36,44 @@ public class QwenPlanner implements Planner {
     private final ProjectContextService projectContextService;
     private final LlmClient llmClient;
     private final ObjectMapper objectMapper;
+    private final WorkspaceService workspaceService;
 
     @Override
     public CodePlan createPlan(AgentContext context) {
-        log.info("task={}, phase={}", context.getTask(), context.getPhase());
+        long start = System.currentTimeMillis();
+        log.info("planner start phase={} task={}", context.getPhase(), summarize(context.getTask(), 120));
 
         String template = promptLoader.load("planner");
         Map<String, String> vars = new HashMap<>();
-
         vars.put("PROJECT", buildProjectSummary());
 
         String matchedSkills = skillManager.buildContext(context.getTask());
-
-        log.info("skill context length={}", matchedSkills == null ? 0 : matchedSkills.length());
-
         vars.put("SKILLS", matchedSkills);
         vars.put("TASK", context.getTask());
-        vars.put(
-                "TARGET_RULE",
-                buildTargetRule()
-        );
+        vars.put("TARGET_RULE", "");
         vars.put("PHASE", context.getPhase().name());
         vars.put("PHASE_RULES", buildPhaseRules(context));
 
         String observations = buildObservations(context);
-        log.info("observations length={}", observations.length());
         vars.put("OBSERVATIONS", observations);
-
         vars.put("LAST_ACTION", buildLastAction(context));
         vars.put("VERIFY_ERRORS", buildVerifyErrors(context));
 
         String projectIndex = buildProjectIndex(context);
-        log.info("project index length={}", projectIndex.length());
         vars.put("PROJECT_INDEX", projectIndex);
 
         String prompt = templateService.render(template, vars);
-
-        log.info("planner prompt length={}", prompt.length());
-        log.info("planner template length={}", template.length());
-        log.info("PROJECT length={}", vars.get("PROJECT") == null ? 0 : vars.get("PROJECT").length());
-        log.info("TASK length={}", vars.get("TASK") == null ? 0 : vars.get("TASK").length());
-        log.info("PHASE_RULES length={}", vars.get("PHASE_RULES") == null ? 0 : vars.get("PHASE_RULES").length());
-        log.info("LAST_ACTION length={}", vars.get("LAST_ACTION") == null ? 0 : vars.get("LAST_ACTION").length());
-
+        log.info(
+                "planner prompt length={} skillsLength={} observationsLength={}",
+                prompt.length(),
+                matchedSkills == null ? 0 : matchedSkills.length(),
+                observations.length()
+        );
         String response = llmClient.chat(prompt);
-        log.info(
-                "plan response length={}",
-                response == null ? 0 : response.length()
-        );
+        log.info("planner response length={}", response == null ? 0 : response.length());
         CodePlan plan = parse(context.getTask(), response);
+        plan = repairExistingFileWritePlan(context, plan);
         plan = repairInvalidPatchPlan(context, plan);
-        log.info(
-                "parsed plan summary={}",
-                summarizePlan(plan)
-        );
         try {
             planValidator.validate(plan);
         } catch (Exception e) {
@@ -94,26 +83,107 @@ public class QwenPlanner implements Planner {
                     "Planner generated invalid plan:"
                             + e.getMessage()
             );
-
-//            plan = repairPlan(plan, e.getMessage());
-//
-//            planValidator.validate(plan);
-
-//            context.getVerifyErrors()
-//                    .add(
-//                            "Plan invalid:"
-//                                    + e.getMessage()
-//                    );
-//
-//
-//            return CodePlan.builder()
-//                    .task(context.getTask())
-//                    .steps(new ArrayList<>())
-//                    .build();
-
         }
 
+        log.info("planner finish cost={}ms plan={}", System.currentTimeMillis() - start, summarizePlan(plan));
         return plan;
+    }
+
+    private CodePlan repairExistingFileWritePlan(AgentContext context, CodePlan plan) {
+        if (plan == null || plan.getSteps() == null || plan.getSteps().isEmpty()) {
+            return plan;
+        }
+        for (PlanStep step : plan.getSteps()) {
+            if (!isCreateTool(step.getTool()) || !(step.getInput() instanceof ToolInput)) {
+                continue;
+            }
+            ToolInput input = (ToolInput) step.getInput();
+            if (!isExistingFile(input.getPath())) {
+                continue;
+            }
+            String oldText = findReadFileContent(context, input.getPath());
+            String newText = writeContent(input);
+            if (oldText != null && newText != null) {
+                log.warn(
+                        "write existing file detected, convert to patch_file path={}",
+                        input.getPath()
+                );
+                step.setTool("patch_file");
+                input.setOldText(oldText);
+                input.setNewText(newText);
+                input.setContent(null);
+                continue;
+            }
+            log.warn(
+                    "write existing file detected, fallback to read_file path={}",
+                    input.getPath()
+            );
+            return CodePlan.builder()
+                    .task(context.getTask())
+                    .steps(singleReadStep(input.getPath()))
+                    .build();
+        }
+        return plan;
+    }
+
+    private String writeContent(ToolInput input) {
+        if (input.getNewText() != null) {
+            return input.getNewText();
+        }
+        return input.getContent();
+    }
+
+    private String findReadFileContent(AgentContext context, String path) {
+        if (context.getObservations() == null) {
+            return null;
+        }
+        File target = workspaceService.resolve(path);
+        for (int i = context.getObservations().size() - 1; i >= 0; i--) {
+            Observation observation = context.getObservations().get(i);
+            if (!"read_file".equals(observation.getTool())
+                    || !observation.isSuccess()
+                    || !(observation.getResult() instanceof FileContent)) {
+                continue;
+            }
+            FileContent content = (FileContent) observation.getResult();
+            File readFile = workspaceService.resolve(content.getPath());
+            if (!sameFile(target, readFile)) {
+                continue;
+            }
+            if (!isCompleteRead(content)) {
+                return null;
+            }
+            return stripReadLineNumbers(content.getLines());
+        }
+        return null;
+    }
+
+    private boolean isCompleteRead(FileContent content) {
+        if (content.getLines() == null || content.getLines().isEmpty()) {
+            return true;
+        }
+        int start = content.getStartLine() == null ? 1 : content.getStartLine();
+        int end = content.getEndLine() == null ? start : content.getEndLine();
+        return content.getLines().size() < end - start + 1;
+    }
+
+    private String stripReadLineNumbers(List<String> lines) {
+        if (lines == null || lines.isEmpty()) {
+            return "";
+        }
+        List<String> content = new ArrayList<>();
+        for (String line : lines) {
+            content.add(line.replaceFirst("^\\d+: ?", ""));
+        }
+        return String.join("\n", content);
+    }
+
+    private boolean sameFile(File left, File right) {
+        try {
+            return left.getCanonicalFile().equals(right.getCanonicalFile());
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private CodePlan repairInvalidPatchPlan(
@@ -141,16 +211,10 @@ public class QwenPlanner implements Planner {
             ToolInput input =
                     (ToolInput) step.getInput();
 
-            if (!isTargetFile(input.getPath())) {
-
-                continue;
-
-            }
-
-            if (isInvalidPatchOldText(input.getOldText())) {
+            if (shouldRepairPatchOldText(input)) {
 
                 log.warn(
-                        "invalid target patch oldText detected, fallback to read_file path={}",
+                        "invalid patch oldText detected, fallback to read_file path={}",
                         input.getPath()
                 );
 
@@ -167,56 +231,64 @@ public class QwenPlanner implements Planner {
 
     }
 
-
-    private String summarizePlan(
-            CodePlan plan
-    ){
-
-
-        if(plan==null
-                ||
-                plan.getSteps()==null
-                ||
-                plan.getSteps().isEmpty()){
-
-            return "empty";
-
+    private boolean shouldRepairPatchOldText(ToolInput input) {
+        if (input == null || input.getPath() == null || isEmptyExistingFile(input.getPath())) {
+            return false;
         }
+        return isInvalidPatchOldText(input.getOldText())
+                || !oldTextExists(input.getPath(), input.getOldText());
+    }
 
-
-        StringBuilder sb =
-                new StringBuilder();
-
-
-        for(PlanStep step:plan.getSteps()){
-
-            if(sb.length()>0){
-
-                sb.append("; ");
-
-            }
-
-
-            sb.append(step.getTool());
-
-
-            if(step.getInput() instanceof ToolInput){
-
-                ToolInput input =
-                        (ToolInput)step.getInput();
-
-
-                sb.append("(")
-                        .append(input.getPath())
-                        .append(")");
-
-            }
-
+    private boolean oldTextExists(String path, String oldText) {
+        if (path == null || oldText == null) {
+            return false;
         }
+        try {
+            File file = workspaceService.resolve(path);
+            if (!file.exists() || !file.isFile()) {
+                return true;
+            }
+            String content = new String(
+                    Files.readAllBytes(file.toPath()),
+                    StandardCharsets.UTF_8
+            );
+            return content.contains(oldText)
+                    || normalizeLineSeparator(content).contains(normalizeLineSeparator(oldText));
+        } catch (Exception e) {
+            return true;
+        }
+    }
 
+    private String normalizeLineSeparator(String text) {
+        return text.replace("\r\n", "\n").replace("\r", "\n");
+    }
 
-        return sb.toString();
+    private boolean isCreateTool(String tool) {
+        return "write_file".equals(tool) || "create_file".equals(tool);
+    }
 
+    private boolean isExistingFile(String path) {
+        if (path == null) {
+            return false;
+        }
+        try {
+            File file = workspaceService.resolve(path);
+            return file.exists() && file.isFile();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private boolean isEmptyExistingFile(String path) {
+        if (path == null) {
+            return false;
+        }
+        try {
+            File file = workspaceService.resolve(path);
+            return file.exists() && file.isFile() && file.length() == 0;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private List<PlanStep> singleReadStep(
@@ -245,27 +317,12 @@ public class QwenPlanner implements Planner {
 
     }
 
-    private boolean isTargetFile(
-            String path
-    ) {
-
-        if (path == null) {
-
-            return false;
-
-        }
-
-        return path.replace("\\", "/")
-                .endsWith("DataPrepEventHandler.java");
-
-    }
-
     private boolean isInvalidPatchOldText(
             String oldText
     ) {
 
         if (oldText == null
-                || oldText.trim().length() < 50) {
+                || oldText.trim().isEmpty()) {
 
             return true;
 
@@ -280,85 +337,6 @@ public class QwenPlanner implements Planner {
                 || normalized.contains("...");
 
     }
-
-    private String buildTargetRule() {
-        return "Target File Rule:\n" +
-                "\n" +
-                "如果任务涉及:\n" +
-                "DataPrepEventHandler.java\n" +
-                "\n" +
-                "该文件已经存在。\n" +
-                "\n" +
-                "禁止:\n" +
-                "write_file\n" +
-                "\n" +
-                "禁止:\n" +
-                "create_file\n" +
-                "\n" +
-                "必须:\n" +
-                "\n" +
-                "Step1:\n" +
-                "read_file\n" +
-                "\n" +
-                "read_file path必须使用search_code返回的真实path，禁止根据package自行拼接。\n" +
-                "\n" +
-                "Step2:\n" +
-                "patch_file\n" +
-                "\n" +
-                "patch_file path必须使用read_file返回的真实path。\n" +
-                "\n" +
-                "patch_file必须基于read_file返回oldText。\n" +
-                "\n" +
-                "任何情况下不能重新生成整个Target。\n" +
-                "\n";
-    }
-    
-    private CodePlan repairPlan(
-            CodePlan plan,
-            String error
-    ){
-
-        if(error.contains("must use patch_file")){
-
-
-            for(PlanStep step:plan.getSteps()){
-
-
-                if("write_file".equals(step.getTool())
-                        &&
-                        step.getInput()!=null){
-
-
-                    ToolInput input =
-                            (ToolInput)step.getInput();
-
-
-//                    if(isTargetFile(input.getPath())){
-                    if(input.getPath().contains("DataPrepEventHandler")){
-
-
-                        log.warn(
-                                "auto repair write_file -> patch_file {}",
-                                input.getPath()
-                        );
-
-
-                        step.setTool("patch_file");
-
-                    }
-
-                }
-
-            }
-
-        }
-
-
-        return plan;
-
-    }
-
-
 
     private CodePlan parse(String task, String json) {
         try {
@@ -408,7 +386,6 @@ public class QwenPlanner implements Planner {
                                 .build()
                 );
             }
-            normalizeTargetTool(steps);
             return CodePlan.builder()
                     .task(task)
                     .steps(steps)
@@ -448,49 +425,6 @@ public class QwenPlanner implements Planner {
                         +
                         message
         );
-
-    }
-
-    private void normalizeTargetTool(List<PlanStep> steps){
-
-
-        for(PlanStep step:steps){
-
-
-            if(step.getInput() instanceof ToolInput){
-
-
-                ToolInput input =
-                        (ToolInput)step.getInput();
-
-
-                String path=input.getPath();
-
-
-                if(path==null){
-                    continue;
-                }
-
-
-                if(path.endsWith(
-                        "DataPrepEventHandler.java"
-                )
-                        &&
-                        "write_file".equals(step.getTool())){
-
-
-                    log.warn(
-                            "normalize target write_file -> patch_file"
-                    );
-
-
-                    step.setTool("patch_file");
-
-                }
-
-            }
-
-        }
 
     }
 
@@ -617,7 +551,7 @@ public class QwenPlanner implements Planner {
             }
 
             if (o.getResult() != null) {
-                String result = String.valueOf(o.getResult());
+                String result = formatObservationResult(o.getResult());
                 int maxResultLength =
                         "read_file".equals(o.getTool())
                                 ? 8000
@@ -636,6 +570,17 @@ public class QwenPlanner implements Planner {
         }
 
         return sb.toString();
+    }
+
+    private String formatObservationResult(Object result) {
+        if (result instanceof FileContent) {
+            FileContent content = (FileContent) result;
+            return "path="
+                    + content.getPath()
+                    + "\ncontent:\n"
+                    + stripReadLineNumbers(content.getLines());
+        }
+        return String.valueOf(result);
     }
 
     private String buildProjectSummary() {
@@ -692,5 +637,30 @@ public class QwenPlanner implements Planner {
             return text.substring(start, end + 1);
         }
         return text;
+    }
+
+    private String summarizePlan(CodePlan plan) {
+        if (plan == null || plan.getSteps() == null || plan.getSteps().isEmpty()) {
+            return "empty";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (PlanStep step : plan.getSteps()) {
+            if (sb.length() > 0) {
+                sb.append("; ");
+            }
+            sb.append(step.getTool());
+            if (step.getInput() instanceof ToolInput) {
+                ToolInput input = (ToolInput) step.getInput();
+                sb.append("(").append(input.getPath()).append(")");
+            }
+        }
+        return sb.toString();
+    }
+
+    private String summarize(String text, int maxLength) {
+        if (text == null || text.length() <= maxLength) {
+            return text;
+        }
+        return text.substring(0, maxLength) + "...";
     }
 }

@@ -582,6 +582,14 @@ patch_file前必须先read_file读取同一路径完整内容。
  "newText":"基于oldText修改后的完整文件内容"
 }
 
+如果已读文件为空:
+
+{
+ "path":"文件路径",
+ "oldText":"",
+ "newText":"完整文件内容"
+}
+
 # Tool Selection Rules
 
 生成每一个step前必须判断文件状态。
@@ -615,13 +623,13 @@ read_file
 猜测文件不存在。
 
 
-4. DataPrepEventHandler.java属于Target:
+4. 如果 Skill Target 指向已有文件:
 永远只能:
 patch_file
 
 
 禁止生成:
-write_file DataPrepEventHandler.java
+write_file 修改 Skill Target
 
 # Planning Rules
 
@@ -710,10 +718,7 @@ Repository搜索
 
 2. 修改已有文件必须使用 patch_file。
 
-3. Target 文件:
-DataPrepEventHandler.java
-
-属于已有文件。
+3. 如果 Skill 指定的 Target 文件已经存在:
 
 修改 Target 必须:
 
@@ -737,7 +742,7 @@ input必须包含:
 
 5. 禁止:
 
-write_file修改已有Java文件。
+write_file修改任何已有文件。
 
 6. 禁止:
 

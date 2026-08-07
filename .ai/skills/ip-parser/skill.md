@@ -144,3 +144,8 @@ getIpInfo(eventData);
   - 参数
   - 调用方式
   - 字段名称
+  - 兜底包名和伪造路径
+
+  4. Target 已知且已存在时，必须先 search_code/read_file 读取其真实路径和 package，再做任何修改判断；禁止自行猜测 package 或生成 com.example、example 等兜底路径。
+
+  5. 如果未来需要新增辅助类，必须以 Target 真实 package 为基准生成，不得偏离 Target 所在业务包。

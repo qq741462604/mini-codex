@@ -9,7 +9,8 @@ import org.springframework.stereotype.Component;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileReader;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -198,8 +199,9 @@ public class ReadFileTool extends BaseTool {
 
 
             reader =
-                    new BufferedReader(
-                            new FileReader(file)
+                    Files.newBufferedReader(
+                            file.toPath(),
+                            StandardCharsets.UTF_8
                     );
 
 

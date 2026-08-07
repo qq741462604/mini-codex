@@ -51,6 +51,11 @@ public class Skill {
             new ArrayList<>();
 
     /**
+     * 是否每次请求都生效
+     */
+    private boolean alwaysApply;
+
+    /**
      * Skill指定修改目标
      */
     private SkillTarget target;
