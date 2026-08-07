@@ -52,9 +52,35 @@ Step4:
 新文件使用write_file创建，已有文件使用patch_file修改
 
 如果Skill没有匹配:
+
 才进行普通分析。
 
+# Planning Mode
 
+禁止一次生成完整执行计划。
+
+Agent必须分阶段运行:
+
+Phase ANALYSIS:
+
+只能输出:
+- search_code
+- read_file
+
+
+等待工具执行结果。
+
+
+Phase CODING:
+
+只有当OBSERVATIONS包含真实read_file结果后:
+
+允许:
+- write_file
+- patch_file
+
+禁止:
+根据class/package猜测路径。
 
 # Available Skills
 
@@ -261,25 +287,15 @@ write_file必须:
 
 则:
 
-当前任务进入代码修改锁定状态。
+当read_file结果存在于 OBSERVATIONS 后:
 
+下一次Plan只能生成:
+- write_file
+- patch_file
 
-下一次Plan:
-
-只能生成代码修改工具:
-
-- 新文件: write_file
-- 已有文件: patch_file
-
-
-禁止生成:
-
-- search_code
-- read_file
-- list_files
-
-
-直到代码修改工具执行成功。
+禁止:
+- 猜测路径
+- 猜测oldText
 
 ## Code Rule
 
@@ -715,10 +731,10 @@ Repository搜索
 生成 Plan 前必须遵守:
 
 1. 已存在文件禁止使用 write_file。
-
 2. 修改已有文件必须使用 patch_file。
-
 3. 如果 Skill 指定的 Target 文件已经存在:
+4. 每次Plan只允许生成当前阶段需要执行的steps。禁止提前生成未来阶段工具。
+
 
 修改 Target 必须:
 
@@ -801,35 +817,18 @@ VERIFY阶段:
 
 ## PHASE=ANALYSIS
 
+禁止:
+- write_file
+- patch_file
 
-目标：
-
-找到Skill指定目标文件。
-
-
-规则:
-
-如果Skill已经指定目标类:
-
-优先:
-
-1. search_code定位目标类
-2. read_file读取目标类
-
-
-禁止扫描无关结构。
-
+只允许:
+- search_code
+- read_file
 
 完成条件:
-
-已经获取Skill目标文件代码后:
-
-必须进入CODING。
-
+必须获得Target真实文件内容。
 
 最多执行3次工具调用。
-
-
 
 ## PHASE=CODING
 
@@ -940,9 +939,6 @@ Skill要求新增类>修改Target调用
  "steps":[]
 }
 
-
-
-
 # Execution History Rules
 
 1. 如果 OBSERVATIONS 中已经存在成功的 create_file/write_file/patch_file:
@@ -954,6 +950,18 @@ Skill要求新增类>修改Target调用
 
 3. 如果任务目标已经完成:
    - 输出空 steps:
-{
- "steps":[]
-}
+     {
+      "steps":[]
+     }
+
+# Absolute Rules
+
+1. Tool未执行返回结果前，不得使用其未知输出。
+2. search_code之后不得自行生成path。
+3. read_file之前不得生成patch_file。
+4. read_file之前不得生成oldText。
+5. 不允许一次Plan包含:
+   search_code/read_file/write_file/patch_file
+
+
+

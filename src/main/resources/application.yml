@@ -19,7 +19,7 @@ llm:
     key: ${LLM_API_KEY}
 
 #  model: qwen3.7-plus
-  model: qwen3-vl-30b-a3b-thinking
+  model: qwen-plus
 
 spring:
   profiles:
