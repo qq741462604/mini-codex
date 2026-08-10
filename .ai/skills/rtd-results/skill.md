@@ -1,0 +1,96 @@
+name:
+rtd-results
+
+keywords:
+
+- rtdResults
+- procVars
+- predict_rescale_score
+- ScoreAnalysisEventHandler
+- 模型评分
+- 评分返回
+- 返回数据加工
+- RTD返回
+- RTD结果
+
+Target:
+
+class:
+ScoreAnalysisEventHandler
+
+method:
+handle
+
+Rules:
+
+1. 所有返回数据加工逻辑必须在 ScoreAnalysisEventHandler.handle 中完成。
+2. Target 固定为 package com.study.plugin.extension 下的 ScoreAnalysisEventHandler，必须先 search_code/read_file 读取真实路径和完整文件后再修改。
+3. 只能围绕已有 rtdResults 增量追加返回字段，禁止重写 rtdResults 创建、赋值、返回或已有 put 逻辑。
+4. 禁止删除、替换、移动原本逻辑，禁止修改已有方法签名、继承关系、构造器和生命周期。
+5. 禁止新增 Service、Controller、DTO、Config 或辅助类。
+6. 如果目标字段或变量已经存在，必须复用已有代码，禁止重复声明变量或重复 put 同名 key。
+7. 如果需求未明确字段来源，必须优先围绕 eventData、eventFields、rtdResults 的既有代码分析，不能编造外部数据源。
+
+Implementation:
+
+Step1:
+search_code 定位 ScoreAnalysisEventHandler，确认 package 为 com.study.plugin.extension。
+
+Step2:
+read_file 读取完整 ScoreAnalysisEventHandler，确认 handle 方法中已有 rtdResults、eventData、eventFields 等上下文。
+
+Step3:
+如果需求是将 procVars 添加到返回结果:
+
+必须将以下注释打开:
+
+```java
+// Map<String, Object> procVars = eventData.getProcVars();
+```
+
+变为:
+
+```java
+Map<String, Object> procVars = eventData.getProcVars();
+```
+
+然后在不破坏原有 rtdResults 逻辑的前提下增加:
+
+```java
+rtdResults.put("procVars", procVars);
+```
+
+Step4:
+如果需求是将模型评分返回:
+
+必须从 eventFields 取出 predict_rescale_score，转成 String 后放入 rtdResults。
+
+推荐增量代码:
+
+```java
+String predictRescaleScore = String.valueOf(
+        eventFields.getOrDefault("predict_rescale_score", "")
+);
+rtdResults.put("predict_rescale_score", predictRescaleScore);
+```
+
+Step5:
+如果需求是其他 rtdResults 返回数据加工:
+
+只能基于已有 eventData、eventFields、procVars 或上下文中已存在的数据取值，然后使用 rtdResults.put 增量追加字段。
+
+Forbidden:
+
+- create ScoreAnalysisEventHandler
+- replace ScoreAnalysisEventHandler
+- modify package
+- modify handle signature
+- rewrite rtdResults
+- delete existing rtdResults.put
+- delete existing business logic
+- create Service
+- create Controller
+- create DTO
+- create Config
+- hardcode fake package
+- com.example 兜底包名
