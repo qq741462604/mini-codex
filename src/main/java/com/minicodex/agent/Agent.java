@@ -1,17 +1,11 @@
 package com.minicodex.agent;
 
 import com.minicodex.memory.AgentMemoryService;
-import com.minicodex.memory.Memory;
-import com.minicodex.memory.MemoryStore;
 import com.minicodex.runtime.AgentRuntime;
-import com.minicodex.skill.SkillLoader;
 import com.minicodex.trace.AgentTrace;
 import com.minicodex.trace.TraceService;
 import lombok.Builder;
 import lombok.Data;
-
-import java.util.ArrayList;
-import java.util.List;
 
 @Data
 @Builder
@@ -20,10 +14,9 @@ public class Agent {
     private String id;
     private String name;
     private AgentRuntime runtime;
-    private MemoryStore memoryStore;
     private AgentMemoryService memoryService;
     private TraceService traceService;
-    private SkillLoader skillLoader;
+    private AgentContextFactory agentContextFactory;
 
     public AgentResult run(String task) {
         AgentTrace trace = null;
@@ -32,15 +25,10 @@ public class Agent {
         }
         AgentResult result;
         try {
-            AgentContext context = AgentContext.builder()
-                    .agentId(id)
-                    .task(task)
-                    .trace(trace)
-                    .phase(AgentPhase.ANALYSIS)
-                    .memories(memoryStore == null ? new ArrayList<>() : safeMemoryQuery(task))
-                    .observations(new ArrayList<>())
-                    .skills(skillLoader == null ? new ArrayList<>() : skillLoader.load())
-                    .build();
+            if (agentContextFactory == null) {
+                return AgentResult.failed("AgentContextFactory is null");
+            }
+            AgentContext context = agentContextFactory.create(id, task, trace);
             if (runtime == null) {
                 return AgentResult.failed("AgentRuntime is null");
             }
@@ -56,10 +44,5 @@ public class Agent {
             }
         }
         return result;
-    }
-
-    private List<Memory> safeMemoryQuery(String task) {
-        List<Memory> memories = memoryStore.query(task);
-        return memories == null ? new ArrayList<>() : memories;
     }
 }

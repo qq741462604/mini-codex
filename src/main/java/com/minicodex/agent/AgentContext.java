@@ -4,18 +4,16 @@ package com.minicodex.agent;
 import com.minicodex.agent.knowledge.KnowledgeContext;
 import com.minicodex.agent.observation.Observation;
 import com.minicodex.memory.Memory;
-import com.minicodex.planner.CodePlan;
 import com.minicodex.project.ProjectIndex;
 import com.minicodex.skill.Skill;
 import com.minicodex.trace.AgentTrace;
 import lombok.Builder;
 import lombok.Data;
 
-
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.HashMap;
 
 
 
