@@ -3,6 +3,7 @@ package com.minicodex.controller;
 
 import com.minicodex.agent.Agent;
 import com.minicodex.agent.AgentResult;
+import com.minicodex.service.AgentBatchService;
 import com.minicodex.skill.SkillMatcher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -20,12 +21,18 @@ public class AgentController {
 
     private final SkillMatcher skillMatcher;
 
+    private final AgentBatchService batchService;
+
 
 
     @PostMapping("/run")
     public AgentResult run(
             @RequestBody AgentRequest request
     ){
+
+        if (batchService.isBatchRequest(request)) {
+            return batchService.run(request);
+        }
 
         String task = request == null ? null : request.getTask();
         if (!skillMatcher.hasBusinessMatch(task)) {
