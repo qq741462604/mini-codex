@@ -2,6 +2,7 @@ package com.minicodex.agent.result;
 
 
 import com.minicodex.agent.observation.Observation;
+import com.minicodex.tool.FileOperationResult;
 import com.minicodex.tool.ToolInput;
 import org.springframework.stereotype.Component;
 
@@ -101,7 +102,9 @@ public class CodeChangeExtractor {
                 ||
                 "write_file".equals(tool)
                 ||
-                "edit_file".equals(tool);
+                "edit_file".equals(tool)
+                ||
+                "patch_file".equals(tool);
 
     }
 
@@ -113,6 +116,15 @@ public class CodeChangeExtractor {
             Observation o
     ){
 
+        if(o.getResult()
+                instanceof FileOperationResult){
+
+            FileOperationResult result =
+                    (FileOperationResult)o.getResult();
+
+            return result.getPath();
+
+        }
 
         if(o.getInput()
                 instanceof ToolInput){
@@ -148,6 +160,13 @@ public class CodeChangeExtractor {
 
 
         if("edit_file".equals(tool)){
+
+            return "edit";
+
+        }
+
+
+        if("patch_file".equals(tool)){
 
             return "edit";
 
