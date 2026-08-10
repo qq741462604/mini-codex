@@ -1,70 +1,148 @@
 # mini-codex
 
-`mini-codex` 是一个面向企业 Java 项目的代码改造 Agent。项目目标是把已知、可复用的业务改造需求沉淀为 skill，再根据用户输入匹配 skill，自动完成目标项目中的代码定位、读取、修改和结果返回。
+`mini-codex` 是一个面向企业 Java 项目的代码改造 Agent。它接收需求后，先做技能匹配和上下文组装，再驱动规划、工具执行、验证和结果汇总，最终输出本次改造涉及的代码变更。
 
-当前版本已经完成从“单条需求执行”到“批量需求串行执行”的初版能力，并增加了未知需求兜底，避免未匹配 skill 的需求直接进入模型开发流程。
+## 迭代一版本目标
 
-## 核心能力
+本版本重点完成了三件事：
 
-- **Skill 驱动开发**：通过 `.ai/skills/**/skill.md` 定义关键词、目标类、改造规则、实现步骤和禁止行为。
-- **未知需求兜底**：没有命中业务 skill 时，接口直接返回提示语，不进入 Agent 执行链路。
-- **单条需求执行**：兼容原有 `/agent/run` 的 `task` 输入。
-- **批量需求执行**：支持 `tasks` 数组串行执行多个改造点。
-- **失败即停止**：批量执行中任一任务失败，立即停止后续任务，并返回失败序号、任务标识和失败原因。
-- **目标项目隔离**：通过 `codex.workspace.root` 指定目标项目，工具基于工作区路径解析文件。
-- **安全文件修改**：已有文件必须先读取再使用 `patch_file` 修改，避免直接覆盖。
-- **Java 语法校验**：验证阶段引入 JavaParser，按 JDK 11 语言级别解析变更后的 Java 文件。
-- **最小测试约束**：公共 skill 要求新生成目标项目代码后补充最小单元测试或可独立执行的测试类。
-- **代码变更汇总**：接口返回 `changes`，汇总本次执行涉及的创建或修改文件。
+1. 支持单条需求和批量需求串行执行。
+2. 通过 skill 驱动改造，未知需求直接兜底返回，不进入执行链路。
+3. 将目标项目路径、工具执行、验证和上下文创建收敛到清晰的代码流程里，便于后续扩展。
+
+## Skill 核心设计
+
+skill 是本项目的核心。它把“什么需求可以做、要改哪里、怎么改、不能做什么”提前写成结构化规则，让 Agent 不靠临场猜测，而是按既定 skill 执行。
+
+一个 skill 通常包含：
+
+- `name`：skill 名称
+- `keywords`：触发匹配关键词
+- `Target`：目标类和方法
+- `Rules`：改造约束
+- `Implementation`：执行步骤
+- `Forbidden`：禁止行为
+
+### Skill 文件排版说明
+
+skill 文件统一写在 `.ai/skills/<skill-name>/skill.md`。推荐排版顺序如下：
+
+```text
+name:
+keywords:
+Target:
+class:
+method:
+Rules:
+Implementation:
+Forbidden:
+```
+
+当前项目里的 skill 写法有几个硬约束：
+
+- `Target` 要明确到真实类和方法。
+- `Rules` 要写清楚可做和不可做。
+- `Implementation` 要按步骤落地，方便 Agent 按顺序执行。
+- `Forbidden` 要直接列出禁止项，避免越权改动。
+- 公共 skill 优先只做一类改造，不混写多个无关目标。
+
+## 核心流程
+
+1. 调用方请求 `/agent/run`。
+2. `AgentController` 判断是单条请求还是批量请求。
+3. `SkillMatcher` 判断需求是否命中可执行的业务 skill。
+4. 命中后进入 `Agent` 执行链路，开始 trace。
+5. `AgentContextFactory` 创建本次任务专用的 `AgentContext`。
+6. `AgentRuntime` 调用 `AgentExecutor`。
+7. `AgentLoop` 根据阶段状态驱动 `Planner`、`ToolExecutor` 和 `VerifyEngine`。
+8. `ToolExecutor` 执行 `search_code`、`read_file`、`patch_file`、`write_file` 等工具。
+9. `CodeChangeExtractor` 汇总代码变更，返回给调用方。
+
+## 关键代码流程
+
+### 1. 请求入口
+
+- [AgentController.java](src/main/java/com/minicodex/controller/AgentController.java)
+- [AgentBatchService.java](src/main/java/com/minicodex/service/AgentBatchService.java)
+
+`AgentController` 是统一入口。它先判断是否为批量请求，再用 `SkillMatcher` 判断当前任务是否有可执行 skill。批量任务由 `AgentBatchService` 串行处理，任一任务失败即停止后续任务。
+
+### 2. Agent 运行入口
+
+- [Agent.java](src/main/java/com/minicodex/agent/Agent.java)
+- [AgentContextFactory.java](src/main/java/com/minicodex/agent/AgentContextFactory.java)
+
+`Agent.run()` 只负责两件事：启动和结束 trace，以及把任务交给运行链路。  
+`AgentContextFactory` 负责创建新的 `AgentContext`，初始化：
+
+- `agentId`
+- `task`
+- `trace`
+- `phase`
+- `memories`
+- `observations`
+- `skills`
+
+这样每次运行都是独立上下文，不会把上一次任务的数据带到下一次。
+
+### 3. 执行与阶段流转
+
+- [AgentRuntime.java](src/main/java/com/minicodex/runtime/AgentRuntime.java)
+- [AgentExecutor.java](src/main/java/com/minicodex/runtime/AgentExecutor.java)
+- [AgentLoop.java](src/main/java/com/minicodex/runtime/AgentLoop.java)
+- [PhaseManager.java](src/main/java/com/minicodex/agent/phase/PhaseManager.java)
+- [QwenPlanner.java](src/main/java/com/minicodex/planner/QwenPlanner.java)
+
+`AgentExecutor` 负责把 `AgentLoop` 的执行结果转换成最终响应。  
+`AgentLoop` 是核心状态机，按阶段在分析、编码、验证、修复、完成之间流转。它会：
+
+- 让 `Planner` 生成工具计划
+- 让 `ToolExecutor` 执行工具
+- 让 `ProjectIndexer` 重新整理项目索引
+- 让 `VerifyEngine` 在验证阶段检查结果
+
+`QwenPlanner` 是当前的主要规划实现。它会把项目摘要、匹配到的 skill、任务内容、阶段规则、最近观察结果和验证错误拼成 prompt，再交给模型生成 `CodePlan`。之后它还会对计划做两层修正：
+
+- 如果计划要修改已有文件，但工具写成了 `write_file`，会回退成 `patch_file`
+- 如果 `patch_file` 的 `oldText` 不合法或和真实文件不匹配，会回退为先 `read_file`
+
+### 4. 工具执行与保护
+
+- [ToolExecutor.java](src/main/java/com/minicodex/runtime/ToolExecutor.java)
+- [WorkspaceService.java](src/main/java/com/minicodex/workspace/WorkspaceService.java)
+- [ExecutionGuard.java](src/main/java/com/minicodex/guard/ExecutionGuard.java)
+
+工具执行阶段不是直接改文件，而是先经过工作区解析和保护判断。核心约束包括：
+
+- 路径统一落到 `codex.workspace.root`
+- `patch_file` 必须先读文件
+- 创建文件不能覆盖已有文件
+- 工具执行结果会同步进 `observations`
+
+### 5. 验证与结果汇总
+
+- [VerifyEngine.java](src/main/java/com/minicodex/verify/VerifyEngine.java)
+- [CodeValidator.java](src/main/java/com/minicodex/verify/CodeValidator.java)
+- [CodeChangeExtractor.java](src/main/java/com/minicodex/agent/result/CodeChangeExtractor.java)
+
+验证阶段负责检查修改后的 Java 文件和变更结果。最终返回内容包含：
+
+- 成功或失败状态
+- 错误信息
+- 本次执行观察结果
+- 本次代码变更清单 `changes`
 
 ## 技术栈
 
 - Java 8
 - Spring Boot 2.7.2
 - Maven
-- Jackson
 - Lombok
+- Jackson
 - OkHttp
 - JavaParser
-- DashScope 兼容 OpenAI Chat Completions 接口
 
-说明：`mini-codex` 自身当前按 Java 8 构建；生成和校验目标项目代码时，公共 skill 约定目标项目开发环境为 JDK 11。
-
-## 项目结构
-
-```text
-mini-codex
-├── .ai
-│   ├── prompts
-│   │   └── planner.md
-│   └── skills
-│       ├── common-file-editing
-│       ├── date-transform
-│       ├── external-api
-│       ├── ip-parser
-│       └── rtd-results
-├── docs
-├── logs
-├── src
-│   └── main
-│       ├── java/com/minicodex
-│       └── resources
-└── pom.xml
-```
-
-## 核心流程
-
-1. 调用方提交需求到 `/agent/run`。
-2. Controller 判断请求是单条还是批量。
-3. SkillMatcher 根据关键词匹配业务 skill。
-4. 未命中业务 skill 时直接返回兜底提示。
-5. 命中 skill 后进入 Agent 执行链路。
-6. Planner 结合项目上下文、skill、阶段规则生成工具计划。
-7. ToolExecutor 执行 `search_code`、`read_file`、`patch_file`、`write_file` 等工具。
-8. AgentLoop 在分析、编码、验证、修复、完成阶段之间流转。
-9. CodeChangeExtractor 汇总代码变更并返回接口。
-
-## 配置说明
+## 配置
 
 配置文件位于 `src/main/resources/application.yml`。
 
@@ -86,172 +164,31 @@ llm:
   model: qwen-plus
 ```
 
-关键配置：
+关键配置说明：
 
-- `minicodex.home`：mini-codex 自身目录，用于加载 prompt 和核心 skill。
-- `codex.workspace.root`：目标项目目录，所有代码读取和修改都应落在该目录下。
-- `llm.api.key`：模型调用密钥，建议通过环境变量 `LLM_API_KEY` 注入。
+- `minicodex.home`：`mini-codex` 自身目录，用于加载 prompt 和核心 skill。
+- `codex.workspace.root`：目标项目目录，所有代码读取和修改都应落在这里。
+- `llm.api.key`：模型调用密钥，建议通过环境变量注入。
 
-## API 使用
+## 项目边界
 
-### 单条需求
+- 需求必须先命中 skill，未知需求不会直接进入自动开发流程。
+- 批量任务当前按顺序串行执行。
+- 目标项目代码修改必须在工作区内完成。
+- 当前版本以 agent 内部验证为主，是否编译由后续流程决定。
 
-请求：
+## Skill 示例
 
-```http
-POST /agent/run
-Content-Type: application/json
-```
+例如 `rtd-results` skill 主要用于 `ScoreAnalysisEventHandler.handle` 的返回数据加工，它会在规则里写明：
 
-```json
-{
-  "task": "将模型评分返回"
-}
-```
+- 目标类和方法必须固定
+- 只能基于已有上下文增量追加返回字段
+- 不能重写原有返回逻辑
+- 不能新增无关类
 
-响应示例：
+这类写法可以把重复改造沉淀成稳定模板，也方便后续扩展更多业务 skill。
 
-```json
-{
-  "success": true,
-  "message": "agent execute success",
-  "data": [],
-  "changes": [
-    {
-      "action": "edit",
-      "path": "src/main/java/com/study/plugin/extension/ScoreAnalysisEventHandler.java",
-      "success": true
-    }
-  ]
-}
-```
+## 本次产出
 
-### 批量需求
-
-请求：
-
-```json
-{
-  "tasks": [
-    {
-      "id": "score",
-      "task": "将模型评分返回"
-    },
-    {
-      "id": "rtq",
-      "task": "将rtqVars添加到rtdResults返回"
-    }
-  ]
-}
-```
-
-成功响应：
-
-```json
-{
-  "success": true,
-  "message": "batch execute success",
-  "data": {
-    "stopped": false,
-    "failedIndex": null,
-    "failedTaskId": null,
-    "failureReason": null,
-    "results": []
-  },
-  "changes": []
-}
-```
-
-失败响应：
-
-```json
-{
-  "success": false,
-  "message": "batch execute failed, stopped at task 2: task is empty",
-  "data": {
-    "stopped": true,
-    "failedIndex": 2,
-    "failedTaskId": "rtq",
-    "failureReason": "task is empty",
-    "results": []
-  },
-  "changes": []
-}
-```
-
-批量执行策略：
-
-- 串行执行，前一条完成后再执行下一条。
-- 任一任务失败立即停止。
-- 不继续调用模型，避免无意义开销。
-- 接口和日志同时记录失败原因。
-
-## Skill 说明
-
-Skill 位于 `.ai/skills/<skill-name>/skill.md`。
-
-常见结构：
-
-```text
-name:
-skill-name
-
-keywords:
-- 关键词
-
-Target:
-class:
-目标类
-
-method:
-目标方法
-
-Rules:
-1. 约束规则
-
-Implementation:
-具体实现步骤
-
-Forbidden:
-- 禁止行为
-```
-
-当前内置 skill：
-
-- `common-file-editing`：通用文件修改安全规则。
-- `date-transform`：日期字段转换和拼接加工。
-- `external-api`：外部接口调用链生成。
-- `ip-parser`：IP 信息解析增强。
-- `rtd-results`：`ScoreAnalysisEventHandler` 中围绕 `rtdResults` 的返回数据加工。
-
-公共 skill 额外约束：
-
-- 目标项目 Java 代码按 JDK 11 兼容性生成。
-- 新增目标项目代码后，应生成最小单元测试或测试类验证核心逻辑。
-- 外部接口调用类优先通过测试类直接验证 Client 或核心方法，减少完整业务流程测试成本。
-
-## 已完成的关键改造
-
-- 增加未知需求兜底，未匹配业务 skill 时不触发开发。
-- 增加 `rtd-results` skill，支持 `procVars`、`rtqVars`、模型评分等返回数据加工。
-- 修复 `patch_file` 变更未进入 `changes` 的问题。
-- 新增批量执行能力，支持多改造点串行处理。
-- 批量执行失败即停止，并返回失败原因。
-- 强化 skill 对小片段 patch 的约束，降低整文件替换失败风险。
-- 引入 JavaParser，对变更后的 Java 文件进行 JDK 11 语法级校验。
-- 在公共 skill 中补充目标代码 JDK 11 和最小测试生成约束。
-
-## 当前边界
-
-- 需求必须先沉淀为 skill，未知需求不会自动开发。
-- 批量任务串行执行，不支持并行。
-- skill 匹配基于关键词，复杂语义匹配仍依赖后续增强。
-- 当前验证以 Agent 内部工具检查为主，是否编译由调用方或后续流程决定。
-
-## 后续规划
-
-- 增加 skill 热加载或刷新能力，减少服务重启成本。
-- 增加批量任务的执行摘要和耗时统计。
-- 优化 prompt 中整文件 patch 与小片段 patch 的规则一致性。
-- 增加更细粒度的失败分类，例如 skill 未命中、模型计划失败、工具执行失败、验证失败。
-- 增加前端或管理接口，用于维护 skill、查看执行记录和失败原因。
+- 项目说明：`README.md`
+- 领导汇报文档：`mini-codex-iteration1-product-report.md`
