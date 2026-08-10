@@ -38,6 +38,7 @@ Rules:
 7. 如果需求未明确字段来源，必须优先围绕 eventData、eventFields、rtdResults 的既有代码分析，不能编造外部数据源。
 8. patch_file 必须使用小片段增量替换，禁止把整个类或整个文件作为 oldText/newText。
 9. patch_file 的 oldText 禁止包含日志字符串 CustomerEventHandler start... 或任何 ... 字符。
+10. rtdResults.put 追加返回字段必须放到 handle 方法已有 try 代码块内部，和原有 scoreResult 写回逻辑保持同一异常处理边界。
 
 Implementation:
 
@@ -68,6 +69,14 @@ Map<String, Object> procVars = eventData.getProcVars();
 rtdResults.put("procVars", procVars);
 ```
 
+该 rtdResults.put 必须追加到已有 try 代码块内部，建议放在原有:
+
+```java
+rtdResults.put("scoreResult", decision);
+```
+
+之后。
+
 Step4:
 如果需求是将模型评分返回:
 
@@ -94,10 +103,20 @@ String predictRescaleScore = String.valueOf(
 rtdResults.put("predict_rescale_score", predictRescaleScore);
 ```
 
+上述取值和 rtdResults.put 必须追加到已有 try 代码块内部，建议放在原有:
+
+```java
+rtdResults.put("scoreResult", decision);
+```
+
+之后。
+
 Step5:
 如果需求是其他 rtdResults 返回数据加工:
 
 只能基于已有 eventData、eventFields、rtqVars、procVars、externalVars 或上下文中已存在的数据取值，然后使用 rtdResults.put 增量追加字段。
+
+所有 rtdResults.put 追加返回字段必须放到已有 try 代码块内部，禁止放在 try 外部。
 
 如果需要使用被注释的变量，必须只打开对应变量的单行注释，禁止把同一注释块中的无关变量一起打开。
 

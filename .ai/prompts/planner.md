@@ -51,6 +51,13 @@ Step3:
 Step4:
 新文件使用write_file创建，已有文件使用patch_file修改
 
+Step5:
+如果 Available Skills 要求新增测试或测试类:
+业务代码修改完成后，必须继续创建或修改测试文件。
+测试文件不存在时使用write_file创建。
+测试文件已存在时必须read_file后使用patch_file修改。
+禁止只修改业务代码后直接结束。
+
 如果Skill没有匹配:
 才进行普通分析。
 
@@ -172,6 +179,12 @@ read_file完成后:
 - 新文件: write_file
 - 已有文件: patch_file
 
+业务代码修改成功后:
+
+- 如果公共 Skill 要求测试，必须继续为当前改造点生成最小测试类或补充已有测试。
+- 测试文件不存在时允许 write_file 创建。
+- 测试文件已存在时必须 read_file 后 patch_file。
+
 
 禁止:
 
@@ -249,6 +262,20 @@ write_file必须:
 
 新增文件必须优先执行。
 
+## Test Creation Rule
+
+
+如果 Available Skills 要求新增测试或测试类:
+
+
+1. 目标业务代码修改成功后，必须生成最小测试文件或修改已有测试文件。
+2. 测试类只验证当前改造点，禁止引入无关大规模 Mock 或重构。
+3. 如果项目存在 src/test/java，测试文件优先写入 src/test/java 下与目标类一致的包路径。
+4. 如果项目不存在 src/test/java，允许 write_file 创建 src/test/java 下的对应包路径测试类。
+5. 外部接口调用类优先测试 Client 或核心方法的配置读取、请求构造、返回处理。
+6. 字段加工类优先测试新增字段加工逻辑，避免必须执行完整业务流程。
+7. 如果无法构造可运行单元测试，必须生成可独立阅读和执行的最小测试类，并在 description 中说明限制原因。
+
 ## Skill Execution Hard Lock
 
 
@@ -280,6 +307,12 @@ write_file必须:
 
 
 直到代码修改工具执行成功。
+
+如果业务代码修改已经执行成功，且 Available Skills 要求测试:
+
+必须继续进入测试文件创建或修改计划。
+允许 search_code 或 read_file 仅用于确认测试文件是否已存在。
+禁止直接 FINISH。
 
 ## Code Rule
 
@@ -845,6 +878,9 @@ Target文件:
 
 新增文件:
 允许write_file
+
+测试文件:
+业务代码修改成功后允许 write_file 创建或 patch_file 修改
 
 禁止合并。 
 

@@ -1,6 +1,8 @@
 package com.minicodex.verify;
 
 
+import com.github.javaparser.ParserConfiguration;
+import com.github.javaparser.StaticJavaParser;
 import com.minicodex.agent.AgentContext;
 import com.minicodex.agent.observation.Observation;
 import com.minicodex.tool.FileContent;
@@ -944,11 +946,16 @@ public class CodeValidator {
 
 
         String content =
-                String.join(
-                        "\n",
+                stripReadLineNumbers(
                         file.getLines()
                 );
 
+
+        validateJavaSyntax(
+                path,
+                content,
+                errors
+        );
 
 
         if(path.endsWith("Controller.java")){
@@ -1000,6 +1007,81 @@ public class CodeValidator {
                 errors
         );
 
+
+    }
+
+
+    private void validateJavaSyntax(
+            String path,
+            String content,
+            List<String> errors
+    ){
+
+
+        if(path==null
+                ||
+                content==null
+                ||
+                !path.replace("\\","/")
+                        .endsWith(".java")){
+
+            return;
+
+        }
+
+
+        if(!looksLikeCompleteJavaSource(content)){
+
+            return;
+
+        }
+
+
+        try{
+
+            ParserConfiguration configuration =
+                    new ParserConfiguration()
+                            .setLanguageLevel(
+                                    ParserConfiguration.LanguageLevel.JAVA_11
+                            );
+
+            StaticJavaParser.setConfiguration(
+                    configuration
+            );
+
+            StaticJavaParser.parse(
+                    content
+            );
+
+        }catch(Exception e){
+
+            errors.add(
+                    path
+                            +
+                            " Java语法解析失败:"
+                            +
+                            e.getMessage()
+            );
+
+        }
+
+    }
+
+
+    private boolean looksLikeCompleteJavaSource(
+            String content
+    ){
+
+
+        String text =
+                content.trim();
+
+
+        return text.startsWith("package ")
+                &&
+                text.contains(" class ")
+                &&
+                text.endsWith("}");
 
     }
 

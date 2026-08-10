@@ -86,6 +86,7 @@ public class AgentLoop {
     private boolean handleVerifyPhase(AgentContext context) {
         VerifyResult verifyResult = verifyEngine.verify(context);
         if (verifyResult.isSuccess()) {
+            context.getVerifyErrors().clear();
             context.setPhase(AgentPhase.FINISH);
             return true;
         }

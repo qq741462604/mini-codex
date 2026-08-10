@@ -29,7 +29,11 @@ public class VerifyFileLoader {
         Set<String> paths = extractPaths(context);
         for (String path : paths) {
             try {
-                ToolInput input = ToolInput.builder().path(path).build();
+                ToolInput input = ToolInput.builder()
+                        .path(path)
+                        .startLine(1)
+                        .endLine(10000)
+                        .build();
                 Object result = readTool.execute(input, context);
                 context.getObservations().add(
                         Observation.builder()
