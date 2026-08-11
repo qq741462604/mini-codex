@@ -218,6 +218,13 @@ public class QwenPlanner implements Planner {
                     (ToolInput) step.getInput();
 
             if (shouldRepairPatchOldText(input)) {
+                if (shrinkPatchText(input)) {
+                    log.warn(
+                            "invalid patch oldText detected, shrink patch text path={}",
+                            input.getPath()
+                    );
+                    continue;
+                }
 
                 log.warn(
                         "invalid patch oldText detected, fallback to read_file path={}",
@@ -235,6 +242,97 @@ public class QwenPlanner implements Planner {
 
         return plan;
 
+    }
+
+    private boolean shrinkPatchText(ToolInput input) {
+        if (input == null
+                || input.getPath() == null
+                || input.getOldText() == null
+                || input.getNewText() == null) {
+            return false;
+        }
+        try {
+            File file = workspaceService.resolve(input.getPath());
+            if (!file.exists() || !file.isFile()) {
+                return false;
+            }
+            String content = new String(
+                    Files.readAllBytes(file.toPath()),
+                    StandardCharsets.UTF_8
+            );
+            PatchText patchText = buildMinimalPatchText(
+                    input.getOldText(),
+                    input.getNewText()
+            );
+            if (patchText == null
+                    || patchText.getOldText() == null
+                    || patchText.getOldText().trim().isEmpty()
+                    || isInvalidPatchOldText(patchText.getOldText())) {
+                return false;
+            }
+            if (!content.contains(patchText.getOldText())
+                    && !normalizeLineSeparator(content).contains(normalizeLineSeparator(patchText.getOldText()))) {
+                return false;
+            }
+            input.setOldText(patchText.getOldText());
+            input.setNewText(patchText.getNewText());
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private PatchText buildMinimalPatchText(String oldText, String newText) {
+        int prefix = commonPrefixLength(oldText, newText);
+        int oldEnd = oldText.length();
+        int newEnd = newText.length();
+        while (oldEnd > prefix
+                && newEnd > prefix
+                && oldText.charAt(oldEnd - 1) == newText.charAt(newEnd - 1)) {
+            oldEnd--;
+            newEnd--;
+        }
+        String oldPatch = oldText.substring(prefix, oldEnd);
+        String newPatch = newText.substring(prefix, newEnd);
+        oldPatch = expandToLineBoundary(oldText, oldPatch, prefix, oldEnd);
+        newPatch = expandToLineBoundary(newText, newPatch, prefix, newEnd);
+        if (oldPatch.equals(oldText) && newPatch.equals(newText)) {
+            return null;
+        }
+        return PatchText.builder()
+                .oldText(oldPatch)
+                .newText(newPatch)
+                .build();
+    }
+
+    private int commonPrefixLength(String left, String right) {
+        int max = Math.min(left.length(), right.length());
+        int index = 0;
+        while (index < max && left.charAt(index) == right.charAt(index)) {
+            index++;
+        }
+        return index;
+    }
+
+    private String expandToLineBoundary(String source, String text, int start, int end) {
+        int lineStart = start;
+        while (lineStart > 0) {
+            char current = source.charAt(lineStart - 1);
+            if (current == '\n' || current == '\r') {
+                break;
+            }
+            lineStart--;
+        }
+        int lineEnd = end;
+        while (lineEnd < source.length()) {
+            char current = source.charAt(lineEnd);
+            lineEnd++;
+            if (current == '\n') {
+                break;
+            }
+        }
+        String expanded = source.substring(lineStart, lineEnd);
+        return expanded.isEmpty() ? text : expanded;
     }
 
     private boolean shouldRepairPatchOldText(ToolInput input) {
@@ -668,5 +766,12 @@ public class QwenPlanner implements Planner {
             return text;
         }
         return text.substring(0, maxLength) + "...";
+    }
+
+    @lombok.Data
+    @lombok.Builder
+    private static class PatchText {
+        private String oldText;
+        private String newText;
     }
 }
