@@ -48,3 +48,4 @@ logs/*
 /logs/
 /docs/
 /.mvn/
+/graphify-out/
