@@ -2,6 +2,12 @@
 
 `mini-codex` 是一个面向企业 Java 项目的代码改造 Agent。它接收需求后，先做技能匹配和上下文组装，再驱动规划、工具执行、验证和结果汇总，最终输出本次改造涉及的代码变更。
 
+## 当前架构
+
+源码采用四层架构：`interfaces` 负责 HTTP 适配，`application` 编排 Agent 用例，`domain` 承载状态与规则，`infrastructure` 提供 LLM、工作区、Prompt、skill 与工具实现；`bootstrap` 只负责 Spring 启动和装配。
+
+应用层通过 `WorkspacePort`、`SkillRepository`、`PromptRepository`、`LlmClient`、`MemoryStore` 和 `AgentTool` 访问外部能力，不直接依赖基础设施实现。完整类职责见 `docs/architecture/class-catalog.md`。
+
 ## 迭代一版本目标
 
 本版本重点完成了三件事：
@@ -62,15 +68,15 @@ Forbidden:
 
 ### 1. 请求入口
 
-- [AgentController.java](src/main/java/com/minicodex/controller/AgentController.java)
-- [AgentBatchService.java](src/main/java/com/minicodex/service/AgentBatchService.java)
+- [AgentController.java](src/main/java/com/minicodex/interfaces/web/AgentController.java)
+- [AgentBatchService.java](src/main/java/com/minicodex/application/agent/AgentBatchService.java)
 
 `AgentController` 是统一入口。它先判断是否为批量请求，再用 `SkillMatcher` 判断当前任务是否有可执行 skill。批量任务由 `AgentBatchService` 串行处理，任一任务失败即停止后续任务。
 
 ### 2. Agent 运行入口
 
-- [Agent.java](src/main/java/com/minicodex/agent/Agent.java)
-- [AgentContextFactory.java](src/main/java/com/minicodex/agent/AgentContextFactory.java)
+- [Agent.java](src/main/java/com/minicodex/application/agent/Agent.java)
+- [AgentContextFactory.java](src/main/java/com/minicodex/application/agent/AgentContextFactory.java)
 
 `Agent.run()` 只负责两件事：启动和结束 trace，以及把任务交给运行链路。  
 `AgentContextFactory` 负责创建新的 `AgentContext`，初始化：
@@ -87,11 +93,11 @@ Forbidden:
 
 ### 3. 执行与阶段流转
 
-- [AgentRuntime.java](src/main/java/com/minicodex/runtime/AgentRuntime.java)
-- [AgentExecutor.java](src/main/java/com/minicodex/runtime/AgentExecutor.java)
-- [AgentLoop.java](src/main/java/com/minicodex/runtime/AgentLoop.java)
-- [PhaseManager.java](src/main/java/com/minicodex/agent/phase/PhaseManager.java)
-- [QwenPlanner.java](src/main/java/com/minicodex/planner/QwenPlanner.java)
+- [AgentRuntime.java](src/main/java/com/minicodex/application/execution/AgentRuntime.java)
+- [AgentExecutor.java](src/main/java/com/minicodex/application/execution/AgentExecutor.java)
+- [AgentLoop.java](src/main/java/com/minicodex/application/execution/AgentLoop.java)
+- [PhaseManager.java](src/main/java/com/minicodex/application/phase/PhaseManager.java)
+- [QwenPlanner.java](src/main/java/com/minicodex/application/planning/QwenPlanner.java)
 
 `AgentExecutor` 负责把 `AgentLoop` 的执行结果转换成最终响应。  
 `AgentLoop` 是核心状态机，按阶段在分析、编码、验证、修复、完成之间流转。它会：
@@ -108,11 +114,11 @@ Forbidden:
 
 ### 4. 工具执行与保护
 
-- [ToolExecutor.java](src/main/java/com/minicodex/runtime/ToolExecutor.java)
-- [WorkspaceService.java](src/main/java/com/minicodex/workspace/WorkspaceService.java)
-- [ExecutionGuard.java](src/main/java/com/minicodex/guard/ExecutionGuard.java)
+- [ToolExecutor.java](src/main/java/com/minicodex/application/execution/ToolExecutor.java)
+- [WorkspaceService.java](src/main/java/com/minicodex/infrastructure/workspace/WorkspaceService.java)
+- [WorkspacePort.java](src/main/java/com/minicodex/application/port/WorkspacePort.java)
 
-工具执行阶段不是直接改文件，而是先经过工作区解析和保护判断。核心约束包括：
+工具执行阶段通过 `WorkspacePort` 访问受限工作区；具体实现由基础设施层提供。核心约束包括：
 
 - 路径统一落到 `codex.workspace.root`
 - `patch_file` 必须先读文件
@@ -121,9 +127,9 @@ Forbidden:
 
 ### 5. 验证与结果汇总
 
-- [VerifyEngine.java](src/main/java/com/minicodex/verify/VerifyEngine.java)
-- [CodeValidator.java](src/main/java/com/minicodex/verify/CodeValidator.java)
-- [CodeChangeExtractor.java](src/main/java/com/minicodex/agent/result/CodeChangeExtractor.java)
+- [VerifyEngine.java](src/main/java/com/minicodex/application/verification/VerifyEngine.java)
+- [CodeValidator.java](src/main/java/com/minicodex/application/verification/CodeValidator.java)
+- [CodeChangeExtractor.java](src/main/java/com/minicodex/application/service/CodeChangeExtractor.java)
 
 验证阶段负责检查修改后的 Java 文件和变更结果。最终返回内容包含：
 
@@ -175,7 +181,8 @@ llm:
 - 需求必须先命中 skill，未知需求不会直接进入自动开发流程。
 - 批量任务当前按顺序串行执行。
 - 目标项目代码修改必须在工作区内完成。
-- 当前版本以 agent 内部验证为主，是否编译由后续流程决定。
+- 当前版本以 agent 内部验证为主；架构迁移已通过 `mvn -DskipTests compile` 和 HTTP 路由冒烟校验。
+- 已移除未接入的 Git、测试、旧规划与旧保护链路，避免保留不可达或危险能力。
 
 ## Skill 示例
 

@@ -1,5 +1,7 @@
 # mini-codex 项目运行流转图
 
+当前代码按四层组织：`interfaces.web` 接收请求，`application` 编排下列流程，`domain` 承载上下文和计划，`infrastructure` 通过端口提供工作区、Prompt、skill、LLM 与工具能力。
+
 ```text
 /agent/run
    |
@@ -72,4 +74,5 @@ Response
 - `AgentLoop` 是核心循环，驱动规划、工具调用和验证。
 - `ToolExecutor` 负责文件类工具和检索类工具的实际执行。
 - `CodeChangeExtractor` 汇总本次改动结果。
+- `WorkspacePort`、`SkillRepository`、`PromptRepository` 将应用流程与基础设施实现隔离。
 
