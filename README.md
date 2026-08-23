@@ -8,6 +8,133 @@
 
 应用层通过 `WorkspacePort`、`SkillRepository`、`PromptRepository`、`LlmClient`、`MemoryStore` 和 `AgentTool` 访问外部能力，不直接依赖基础设施实现。完整类职责见 `docs/architecture/class-catalog.md`。
 
+### 四层之间怎么理解
+
+可以把这套架构理解成“入口、编排、数据、实现”四个职责区域：
+
+```text
+外部 HTTP 请求
+      |
+      v
+interfaces  接口层：把 HTTP 转成应用请求
+      |
+      v
+application 应用层：编排一次 Agent 用例
+      |
+      +------> domain：读取和更新 Agent 的状态、计划、观察结果
+      |
+      +------> application.port：调用外部能力的接口
+                            ^
+                            |
+                   infrastructure：实现这些接口
+                   文件系统 / LLM / Prompt / skill / 工具
+
+bootstrap：启动 Spring，并把上述组件装配起来
+```
+
+这里有一个容易混淆的点：`bootstrap` 虽然位于 `com.minicodex` 包下，但它不是业务调用层，而是启动装配层；`application.port` 也不是具体实现，而是应用层定义的“我需要什么能力”。例如：
+
+1. `QwenPlanner` 需要读取 Prompt，于是依赖 `PromptRepository`。
+2. `PromptLoader` 位于基础设施层，实现 `PromptRepository`，负责从 `.ai/prompts` 读取文件。
+3. Spring 启动时发现 `PromptLoader` 是 Bean，并把它注入到 `QwenPlanner` 的 `PromptRepository` 字段中。
+4. `QwenPlanner` 只知道“可以通过接口读取 Prompt”，不需要知道文件路径和读取细节。
+
+因此，依赖方向要区分两种关系：
+
+- **业务调用方向**：接口层调用应用层，应用层使用领域模型并调用端口。
+- **代码依赖方向**：应用层依赖端口接口，基础设施层实现端口；应用层不导入基础设施具体类。
+
+### 四层分别负责什么
+
+#### 1. `interfaces`：接收请求和返回响应
+
+接口层只关心外部协议，不负责规划、改文件或验证代码。
+
+- `AgentController` 暴露 `/agent/run`。
+- `AgentRequest`、`AgentTaskRequest` 定义请求 JSON 的结构。
+- 单条请求和批量请求在这里完成基本分流，然后交给应用层服务。
+
+接口层不应该直接调用 `QwenClient`、`WorkspaceService` 或具体文件工具；否则 HTTP 适配和业务实现会耦合在一起。
+
+#### 2. `application`：编排一次完整用例
+
+应用层是系统的“流程控制中心”，负责决定先做什么、后做什么，但不负责保存具体文件或拼接底层 HTTP 请求。
+
+- `AgentBatchService`：按顺序处理批量需求。
+- `AgentRuntime`、`AgentExecutor`、`AgentLoop`：驱动一次 Agent 运行。
+- `PhaseManager`、各阶段处理器、`AgentPolicy`：控制分析、编码、验证、修复和完成阶段。
+- `QwenPlanner`：组装上下文、调用 LLM 端口并生成 `CodePlan`。
+- `ToolExecutor`：根据计划查找并执行工具，记录 `Observation`。
+- `VerifyEngine`、`CodeValidator`：检查改动结果并生成验证错误。
+- `CodeChangeExtractor`：从观察结果中提取最终变更清单。
+
+应用层依赖 `domain` 中的状态对象，也依赖 `application.port` 中的接口；它不应该依赖基础设施的具体实现类。
+
+#### 3. `domain`：保存业务状态和规则数据
+
+领域层描述 Agent 处理过程中“是什么”，不负责 Spring 启动、文件读写或网络请求。
+
+- `AgentContext`：一次任务的完整上下文。
+- `AgentPhase`、`AgentStatus`：当前阶段和运行状态。
+- `CodePlan`、`PlanStep`：模型生成的计划及其步骤。
+- `Observation`：工具执行后的观察记录。
+- `AgentResult`、`CodeChange`：最终返回结果和代码变更。
+- `Skill`、`Memory`、`ProjectIndex`、`AgentTrace`：技能、记忆、项目索引和执行跟踪数据。
+- `ToolInput`、`FileContent`、`FileOperationResult`：工具调用所需的输入输出数据。
+
+领域对象可以被接口层和应用层使用，但不应反过来依赖 Controller、LLM 客户端或文件系统服务。
+
+#### 4. `infrastructure`：提供技术实现
+
+基础设施层负责“怎么做”，把外部系统和本地资源接入应用。
+
+- `QwenClient`：实现 `LlmClient`，调用配置的模型服务。
+- `WorkspaceService`：实现 `WorkspacePort`，解析路径并限制访问范围。
+- `PromptLoader`：实现 `PromptRepository`，读取 `.ai/prompts` 下的模板。
+- `SkillLoader`：实现 `SkillRepository`，读取 `.ai/skills` 下的 skill 文件。
+- `ReadFileTool`、`PatchFileTool`、`WriteFileTool` 等：实现 `AgentTool`，执行受工作区保护的文件操作。
+- `SimpleMemoryStore`：实现 `MemoryStore`，保存运行记忆。
+
+基础设施可以依赖领域数据模型，也可以依赖应用层定义的端口；但具体实现不应被接口层或领域层直接调用。
+
+### 一次 `/agent/run` 请求如何流转
+
+下面按实际运行顺序展开：
+
+1. **启动阶段**：`bootstrap.MiniCodexApplication` 启动 Spring，扫描 `com.minicodex`；`bootstrap.AgentConfig` 创建默认 `Agent` Bean。
+2. **进入接口层**：`interfaces.web.AgentController` 接收请求，识别单条或批量模式。
+3. **技能预检查**：应用层的 `SkillMatcher` 通过 `SkillRepository` 读取并匹配 skill；未命中时直接返回兜底结果，不进入自动改造。
+4. **创建上下文**：`AgentContextFactory` 创建独立的 `AgentContext`，初始化任务、阶段、记忆、技能、观察和 trace。
+5. **开始执行**：`Agent` 调用 `AgentRuntime`，`AgentRuntime` 再交给 `AgentExecutor` 和 `AgentLoop`。
+6. **分析阶段**：`AgentLoop` 调用 `QwenPlanner`；规划器通过 `PromptRepository` 读取模板，通过 `WorkspacePort` 获取项目上下文，通过 `LlmClient` 请求模型，生成 `CodePlan`。
+7. **工具阶段**：`ToolExecutor` 根据 `PlanStep` 从 `ToolRegistry` 找到 `AgentTool`；具体工具在基础设施层执行，并把结果写入 `Observation`。
+8. **保护检查**：执行文件工具前，应用层检查阶段白名单、路径边界、文件是否已读取，以及创建/修改规则。
+9. **阶段流转**：工具完成后，`PhaseManager` 根据上下文决定继续分析、进入编码、验证、修复或完成。
+10. **验证阶段**：`VerifyEngine` 和 `CodeValidator` 检查 Java 文件和变更结果；失败时将错误写回上下文，推动进入修复阶段。
+11. **结果汇总**：`CodeChangeExtractor` 从成功的文件操作观察中提取 `changes`，`AgentExecutor` 组装 `AgentResult`。
+12. **返回响应**：`TraceService` 结束 trace，Controller 将结果序列化为 HTTP 响应。
+
+整个过程可以简化为：
+
+```text
+HTTP
+ -> Controller
+ -> AgentBatchService / SkillMatcher
+ -> AgentContextFactory
+ -> AgentRuntime
+ -> AgentExecutor
+ -> AgentLoop
+    -> Planner -> LlmClient / PromptRepository / WorkspacePort
+    -> ToolExecutor -> AgentTool
+    -> VerifyEngine
+ -> CodeChangeExtractor
+ -> HTTP 响应
+```
+
+### 为什么不让应用层直接调用基础设施
+
+如果 `QwenPlanner` 直接依赖 `QwenClient`、`WorkspaceService`，以后更换模型供应商、替换文件系统或改成数据库 skill 存储，就需要修改应用流程代码。现在应用层只依赖 `LlmClient`、`WorkspacePort`、`SkillRepository` 等端口，替换实现时只需新增或修改基础设施适配器，Agent 的业务流程不变。
+
 ## 迭代一版本目标
 
 本版本重点完成了三件事：
