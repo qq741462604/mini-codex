@@ -11,14 +11,9 @@ import lombok.Data;
 @Data
 public class AgentTaskRequest {
 
-    /**
-     * 需求标识，调用方可用于关联返回结果。
-     */
-    private String id;
+  /** 需求标识，调用方可用于关联返回结果。 */
+  private String id;
 
-    /**
-     * 需求内容。
-     */
-    private String task;
-
+  /** 需求内容。 */
+  private String task;
 }

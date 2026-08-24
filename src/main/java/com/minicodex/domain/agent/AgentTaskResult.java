@@ -1,10 +1,8 @@
 package com.minicodex.domain.agent;
 
+import java.util.List;
 import lombok.Builder;
 import lombok.Data;
-
-import java.util.List;
-import com.minicodex.application.agent.Agent;
 
 /**
  * 批量执行中的单个需求执行结果。
@@ -16,34 +14,21 @@ import com.minicodex.application.agent.Agent;
 @Builder
 public class AgentTaskResult {
 
-    /**
-     * 需求序号，从 1 开始。
-     */
-    private int index;
+  /** 需求序号，从 1 开始。 */
+  private int index;
 
-    /**
-     * 需求标识。
-     */
-    private String id;
+  /** 需求标识。 */
+  private String id;
 
-    /**
-     * 需求内容。
-     */
-    private String task;
+  /** 需求内容。 */
+  private String task;
 
-    /**
-     * 是否执行成功。
-     */
-    private boolean success;
+  /** 是否执行成功。 */
+  private boolean success;
 
-    /**
-     * 执行消息或失败原因。
-     */
-    private String message;
+  /** 执行消息或失败原因。 */
+  private String message;
 
-    /**
-     * 代码变更列表。
-     */
-    private List<CodeChange> changes;
-
+  /** 代码变更列表。 */
+  private List<CodeChange> changes;
 }

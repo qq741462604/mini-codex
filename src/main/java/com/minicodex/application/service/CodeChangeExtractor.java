@@ -1,238 +1,126 @@
 package com.minicodex.application.service;
 
-
+import com.minicodex.domain.agent.CodeChange;
 import com.minicodex.domain.agent.Observation;
 import com.minicodex.domain.tool.FileOperationResult;
 import com.minicodex.domain.tool.ToolInput;
-import org.springframework.stereotype.Component;
-
-
 import java.util.ArrayList;
 import java.util.List;
-import com.minicodex.application.agent.Agent;
-import com.minicodex.domain.agent.CodeChange;
-
-
+import org.springframework.stereotype.Component;
 
 @Component
 /**
- * CodeChangeExtractor：负责面向用例的代码变更、结果或跟踪服务。
- * 所属层：应用层。
+ * CodeChangeExtractor：负责面向用例的代码变更、结果或跟踪服务。 所属层：应用层。
  *
  * @author yy
  */
 public class CodeChangeExtractor {
 
+  public List<CodeChange> extract(List<Observation> observations) {
 
+    List<CodeChange> result = new ArrayList<>();
 
-    public List<CodeChange> extract(
-            List<Observation> observations
-    ){
+    if (observations == null) {
 
-
-        List<CodeChange> result =
-                new ArrayList<>();
-
-
-        if(observations==null){
-
-            return result;
-
-        }
-
-
-
-        for(Observation o:observations){
-
-
-            if(!o.isSuccess()){
-
-                continue;
-
-            }
-
-
-
-            if(!isCodeChangeTool(o.getTool())){
-
-                continue;
-
-            }
-
-
-
-            String path =
-                    extractPath(
-                            o
-                    );
-
-
-
-            if(path==null){
-
-                continue;
-
-            }
-
-
-
-            result.add(
-                    CodeChange.builder()
-                            .action(
-                                    convertAction(
-                                            o.getTool()
-                                    )
-                            )
-                            .path(
-                                    normalize(path)
-                            )
-                            .success(true)
-                            .build()
-            );
-
-
-        }
-
-
-        return distinct(result);
-
+      return result;
     }
 
+    for (Observation o : observations) {
 
+      if (!o.isSuccess()) {
 
+        continue;
+      }
 
+      if (!isCodeChangeTool(o.getTool())) {
 
-    private boolean isCodeChangeTool(
-            String tool
-    ){
+        continue;
+      }
 
-        return "create_file".equals(tool)
-                ||
-                "write_file".equals(tool)
-                ||
-                "edit_file".equals(tool)
-                ||
-                "patch_file".equals(tool);
+      String path = extractPath(o);
 
+      if (path == null) {
+
+        continue;
+      }
+
+      result.add(
+          CodeChange.builder()
+              .action(convertAction(o.getTool()))
+              .path(normalize(path))
+              .success(true)
+              .build());
     }
 
+    return distinct(result);
+  }
 
+  private boolean isCodeChangeTool(String tool) {
 
+    return "create_file".equals(tool)
+        || "write_file".equals(tool)
+        || "edit_file".equals(tool)
+        || "patch_file".equals(tool);
+  }
 
+  private String extractPath(Observation o) {
 
-    private String extractPath(
-            Observation o
-    ){
+    if (o.getResult() instanceof FileOperationResult) {
 
-        if(o.getResult()
-                instanceof FileOperationResult){
+      FileOperationResult result = (FileOperationResult) o.getResult();
 
-            FileOperationResult result =
-                    (FileOperationResult)o.getResult();
-
-            return result.getPath();
-
-        }
-
-        if(o.getInput()
-                instanceof ToolInput){
-
-
-            ToolInput input =
-                    (ToolInput)o.getInput();
-
-
-            return input.getPath();
-
-        }
-
-
-
-        return null;
-
+      return result.getPath();
     }
 
+    if (o.getInput() instanceof ToolInput) {
 
+      ToolInput input = (ToolInput) o.getInput();
 
-
-
-    private String convertAction(
-            String tool
-    ){
-
-        if("create_file".equals(tool)){
-
-            return "create";
-
-        }
-
-
-        if("edit_file".equals(tool)){
-
-            return "edit";
-
-        }
-
-
-        if("patch_file".equals(tool)){
-
-            return "edit";
-
-        }
-
-
-        return "write";
-
+      return input.getPath();
     }
 
+    return null;
+  }
 
+  private String convertAction(String tool) {
 
+    if ("create_file".equals(tool)) {
 
-
-    private String normalize(
-            String path
-    ){
-
-        return path.replace("\\","/");
-
+      return "create";
     }
 
+    if ("edit_file".equals(tool)) {
 
-
-
-
-    private List<CodeChange> distinct(
-            List<CodeChange> list
-    ){
-
-        List<CodeChange> result =
-                new ArrayList<>();
-
-
-        for(CodeChange c:list){
-
-
-            boolean exists =
-                    result.stream()
-                            .anyMatch(
-                                    x ->
-                                            x.getPath()
-                                                    .equals(c.getPath())
-                            );
-
-
-            if(!exists){
-
-                result.add(c);
-
-            }
-
-        }
-
-
-        return result;
-
+      return "edit";
     }
 
+    if ("patch_file".equals(tool)) {
 
+      return "edit";
+    }
+
+    return "write";
+  }
+
+  private String normalize(String path) {
+
+    return path.replace("\\", "/");
+  }
+
+  private List<CodeChange> distinct(List<CodeChange> list) {
+
+    List<CodeChange> result = new ArrayList<>();
+
+    for (CodeChange c : list) {
+
+      boolean exists = result.stream().anyMatch(x -> x.getPath().equals(c.getPath()));
+
+      if (!exists) {
+
+        result.add(c);
+      }
+    }
+
+    return result;
+  }
 }

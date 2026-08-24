@@ -1,89 +1,46 @@
 package com.minicodex.infrastructure.memory;
 
-
-
-import org.springframework.stereotype.Component;
-
-
-import java.util.ArrayList;
-import java.util.List;
 import com.minicodex.application.port.MemoryStore;
 import com.minicodex.domain.memory.Memory;
-
-
+import java.util.ArrayList;
+import java.util.List;
+import org.springframework.stereotype.Component;
 
 @Component
 /**
- * SimpleMemoryStore：提供记忆存储的具体实现。
- * 所属层：基础设施层。
+ * SimpleMemoryStore：提供记忆存储的具体实现。 所属层：基础设施层。
  *
  * @author yy
  */
-public class SimpleMemoryStore
-        implements MemoryStore {
+public class SimpleMemoryStore implements MemoryStore {
 
+  private final List<Memory> memories = new ArrayList<>();
 
+  @Override
+  public void save(Memory memory) {
 
-    private final List<Memory> memories =
-            new ArrayList<>();
+    memories.add(memory);
+  }
 
+  @Override
+  public List<Memory> query(String keyword) {
 
+    List<Memory> result = new ArrayList<>();
 
+    for (Memory memory : memories) {
 
-    @Override
-    public void save(
-            Memory memory
-    ){
+      if (memory.getContent().contains(keyword)) {
 
-        memories.add(
-                memory
-        );
-
+        result.add(memory);
+      }
     }
 
+    return result;
+  }
 
+  @Override
+  public void clear() {
 
-
-    @Override
-    public List<Memory> query(
-            String keyword
-    ){
-
-
-        List<Memory> result =
-                new ArrayList<>();
-
-
-
-        for(Memory memory:memories){
-
-
-            if(memory.getContent()
-                    .contains(keyword)){
-
-
-                result.add(memory);
-
-            }
-
-        }
-
-
-        return result;
-
-
-    }
-
-
-
-
-    @Override
-    public void clear(){
-
-        memories.clear();
-
-    }
-
-
-
+    memories.clear();
+  }
 }

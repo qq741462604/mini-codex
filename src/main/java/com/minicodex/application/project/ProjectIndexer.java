@@ -1,254 +1,123 @@
 package com.minicodex.application.project;
 
-
 import com.minicodex.domain.agent.Observation;
-import com.minicodex.domain.tool.SearchMatch;
-import org.springframework.stereotype.Component;
-
-
-import java.util.List;
-import com.minicodex.application.agent.Agent;
 import com.minicodex.domain.project.ProjectFile;
 import com.minicodex.domain.project.ProjectIndex;
-
+import com.minicodex.domain.tool.SearchMatch;
+import java.util.List;
+import org.springframework.stereotype.Component;
 
 @Component
 /**
- * ProjectIndexer：负责构建和提供项目上下文。
- * 所属层：应用层。
+ * ProjectIndexer：负责构建和提供项目上下文。 所属层：应用层。
  *
  * @author yy
  */
 public class ProjectIndexer {
 
+  public ProjectIndex build(List<Observation> observations) {
 
-    public ProjectIndex build(
-            List<Observation> observations
-    ){
+    ProjectIndex index = new ProjectIndex();
 
+    if (observations == null) {
 
-        ProjectIndex index =
-                new ProjectIndex();
-
-
-
-        if(observations==null){
-
-            return index;
-
-        }
-
-
-
-        for(Observation observation:observations){
-
-
-            if(!observation.isSuccess()){
-
-                continue;
-
-            }
-
-
-            Object result =
-                    observation.getResult();
-
-
-
-            if(!(result instanceof List)){
-
-                continue;
-
-            }
-
-
-
-            List<?> list =
-                    (List<?>) result;
-
-
-
-            for(Object item:list){
-
-
-                String path =
-                        extractPath(item);
-
-
-
-                if(path==null){
-
-                    continue;
-
-                }
-
-
-
-                ProjectFile file =
-                        buildProjectFile(path);
-
-
-
-                classify(
-                        index,
-                        file
-                );
-
-
-            }
-
-
-        }
-
-
-        return index;
-
+      return index;
     }
 
+    for (Observation observation : observations) {
 
+      if (!observation.isSuccess()) {
 
+        continue;
+      }
 
+      Object result = observation.getResult();
 
+      if (!(result instanceof List)) {
 
-    private String extractPath(
-            Object item
-    ){
+        continue;
+      }
 
+      List<?> list = (List<?>) result;
 
-        if(item instanceof String){
+      for (Object item : list) {
 
-            return (String)item;
+        String path = extractPath(item);
 
+        if (path == null) {
+
+          continue;
         }
 
+        ProjectFile file = buildProjectFile(path);
 
-
-        if(item instanceof SearchMatch){
-
-            return ((SearchMatch)item)
-                    .getPath();
-
-        }
-
-
-        return null;
-
+        classify(index, file);
+      }
     }
 
+    return index;
+  }
 
+  private String extractPath(Object item) {
 
+    if (item instanceof String) {
 
-
-
-    private ProjectFile buildProjectFile(
-            String path
-    ){
-
-
-        ProjectFile file =
-                new ProjectFile();
-
-
-
-        file.setPath(
-                path
-        );
-
-
-        file.setType(
-                getType(path)
-        );
-
-
-        return file;
-
+      return (String) item;
     }
 
+    if (item instanceof SearchMatch) {
 
-
-
-
-
-    private void classify(
-            ProjectIndex index,
-            ProjectFile file
-    ){
-
-
-
-        String path =
-                file.getPath();
-
-
-
-        if(path.contains("Controller")){
-
-
-            index.getControllers()
-                    .add(file);
-
-        }
-
-
-
-        if(path.contains("Service")){
-
-
-            index.getServices()
-                    .add(file);
-
-        }
-
-
-
-        if(path.contains("Entity")){
-
-
-            index.getEntities()
-                    .add(file);
-
-        }
-
-
-
-        if(path.contains("Mapper")){
-
-
-            index.getMappers()
-                    .add(file);
-
-        }
-
-
+      return ((SearchMatch) item).getPath();
     }
 
+    return null;
+  }
 
+  private ProjectFile buildProjectFile(String path) {
 
+    ProjectFile file = new ProjectFile();
 
+    file.setPath(path);
 
+    file.setType(getType(path));
 
-    private String getType(
-            String path
-    ){
+    return file;
+  }
 
+  private void classify(ProjectIndex index, ProjectFile file) {
 
-        int index =
-                path.lastIndexOf(".");
+    String path = file.getPath();
 
+    if (path.contains("Controller")) {
 
-        if(index<0){
-
-            return "";
-
-        }
-
-
-        return path.substring(
-                index+1
-        );
-
-
+      index.getControllers().add(file);
     }
 
+    if (path.contains("Service")) {
 
+      index.getServices().add(file);
+    }
+
+    if (path.contains("Entity")) {
+
+      index.getEntities().add(file);
+    }
+
+    if (path.contains("Mapper")) {
+
+      index.getMappers().add(file);
+    }
+  }
+
+  private String getType(String path) {
+
+    int index = path.lastIndexOf(".");
+
+    if (index < 0) {
+
+      return "";
+    }
+
+    return path.substring(index + 1);
+  }
 }

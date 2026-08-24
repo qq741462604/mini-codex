@@ -1,17 +1,16 @@
 package com.minicodex.application.agent;
 
-import com.minicodex.domain.memory.Memory;
 import com.minicodex.application.port.MemoryStore;
-import com.minicodex.domain.skill.Skill;
 import com.minicodex.application.port.SkillRepository;
-import com.minicodex.domain.trace.AgentTrace;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Component;
-
-import java.util.ArrayList;
-import java.util.List;
 import com.minicodex.domain.agent.AgentContext;
 import com.minicodex.domain.agent.AgentPhase;
+import com.minicodex.domain.memory.Memory;
+import com.minicodex.domain.skill.Skill;
+import com.minicodex.domain.trace.AgentTrace;
+import java.util.ArrayList;
+import java.util.List;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
 
 /**
  * Agent上下文工厂。
@@ -23,28 +22,28 @@ import com.minicodex.domain.agent.AgentPhase;
 @RequiredArgsConstructor
 public class AgentContextFactory {
 
-    private final MemoryStore memoryStore;
-    private final SkillRepository skillLoader;
+  private final MemoryStore memoryStore;
+  private final SkillRepository skillLoader;
 
-    public AgentContext create(String agentId, String task, AgentTrace trace) {
-        return AgentContext.builder()
-                .agentId(agentId)
-                .task(task)
-                .trace(trace)
-                .phase(AgentPhase.ANALYSIS)
-                .memories(safeMemoryQuery(task))
-                .observations(new ArrayList<>())
-                .skills(loadSkills())
-                .build();
-    }
+  public AgentContext create(String agentId, String task, AgentTrace trace) {
+    return AgentContext.builder()
+        .agentId(agentId)
+        .task(task)
+        .trace(trace)
+        .phase(AgentPhase.ANALYSIS)
+        .memories(safeMemoryQuery(task))
+        .observations(new ArrayList<>())
+        .skills(loadSkills())
+        .build();
+  }
 
-    private List<Memory> safeMemoryQuery(String task) {
-        List<Memory> memories = memoryStore.query(task);
-        return memories == null ? new ArrayList<>() : memories;
-    }
+  private List<Memory> safeMemoryQuery(String task) {
+    List<Memory> memories = memoryStore.query(task);
+    return memories == null ? new ArrayList<>() : memories;
+  }
 
-    private List<Skill> loadSkills() {
-        List<Skill> skills = skillLoader.load();
-        return skills == null ? new ArrayList<>() : skills;
-    }
+  private List<Skill> loadSkills() {
+    List<Skill> skills = skillLoader.load();
+    return skills == null ? new ArrayList<>() : skills;
+  }
 }

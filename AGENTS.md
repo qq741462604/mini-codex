@@ -32,14 +32,14 @@
 
 ### Java 类署名规范
 - 新增类文件时，按既有项目风格补充类级 Javadoc。
-- 作者统一写 yy
+- 作者统一写 yy，日期写创建类的日期
 
 示例：
 ```java
 /**
  * ...
  *
- * @author yy
+ * @author yj
  * @date yyyy-MM-dd HH:mm:ss
  */
 ```
