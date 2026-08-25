@@ -26,7 +26,6 @@ public class AgentMemoryService {
             .key("task_" + System.currentTimeMillis())
             .content("TASK:\n" + task + "\nRESULT:\n" + content)
             .type(MemoryType.TASK)
-            .content(content)
             .createTime(new Date())
             .build());
   }
