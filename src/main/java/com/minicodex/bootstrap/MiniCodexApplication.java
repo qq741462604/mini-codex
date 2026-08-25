@@ -5,6 +5,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
+import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
@@ -14,6 +15,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * @author yy
  */
 @SpringBootApplication(scanBasePackages = "com.minicodex")
+@MapperScan("com.minicodex.infrastructure.memory")
 public class MiniCodexApplication {
 
   public static void main(String[] args) throws IOException {

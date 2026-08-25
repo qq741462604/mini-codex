@@ -4,9 +4,7 @@ import com.minicodex.application.port.MemoryStore;
 import com.minicodex.domain.memory.Memory;
 import java.util.ArrayList;
 import java.util.List;
-import org.springframework.stereotype.Component;
 
-@Component
 /**
  * SimpleMemoryStore：提供记忆存储的具体实现。 所属层：基础设施层。
  *

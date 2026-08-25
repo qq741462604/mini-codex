@@ -24,6 +24,11 @@ spring:
     active: local
   jackson:
     time-zone: GMT+8
-
-
+  datasource:
+    url: jdbc:mysql://192.168.211.133:3306/mytest?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+    username: root
+    password: pw
+  sql:
+    init:
+      mode: always
 
